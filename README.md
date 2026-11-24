@@ -1,0 +1,30 @@
+# Swipe Media
+
+A swipe-based photo & video cleanup app for Android. Swipe through your library, remove what you don't need, compress the heavy stuff, and watch the storage come back — all on-device, with no account and no upload.
+
+> **Status:** design/spec stage. No application code yet — the repo currently holds the product spec and design sources.
+
+## Repo layout
+
+| Path | What it is |
+|---|---|
+| `dev-data/user_flow.md` | Full product spec: flow map, screen-by-screen detail, global rules |
+| `dev-data/v3.figcraft` | FigCraft design source (UI mockups) |
+| `AGENTS.md` | Working rules for AI agents (build locations, conventions, Azure targets) |
+
+Planned implementation layout:
+
+- `mobile/` — Expo Android app (`expo-dev-client`, never Expo Go)
+- `api/` — API app
+- `web-app/` — web app
+
+## Product concepts
+
+- **Swipe-first cleanup** — swipe up = remove, left = previous, right = keep.
+- **30-day trash** — nothing is deleted instantly; every removal is restorable for 30 days.
+- **Privacy** — scanning, matching, and compression run entirely on-device. Nothing leaves the phone.
+- **Pro tier** — unlimited cleanups and max-savings compression via Google Play Billing; trash + restore is free for everyone.
+
+## Design source
+
+UI follows the FigCraft file in `dev-data/`, page **2 - Nov 11 2026 - v2**, together with the flow spec in `user_flow.md`. Check both before implementing any screen.
