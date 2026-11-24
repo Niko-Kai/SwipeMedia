@@ -11,6 +11,7 @@ A swipe-based photo & video cleanup app for Android. Swipe through your library,
 | `dev-data/user_flow.md` | Full product spec: flow map, screen-by-screen detail, global rules |
 | `dev-data/v3.figcraft` | FigCraft design source (UI mockups) |
 | `.agents/skills/` | Five skills agents load before working (usage map in `AGENTS.md`) |
+| `PLAN.md` | Phased build plan: layout, session state machine, native module spec, tests, gates |
 | `AGENTS.md` | Working rules for AI agents (build locations, conventions, skills, Azure targets) |
 
 Planned implementation layout:
