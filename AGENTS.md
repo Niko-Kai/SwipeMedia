@@ -9,7 +9,7 @@ Currently in design/spec stage; application code will live in the locations belo
 
 ## Code locations
 
-- Android app: `.\mobile\android`
+- Android app: Expo app root `.\mobile` (JS, config, assets); generated native project `.\mobile\android`
 - API app: `.\api`
 - Web app: `.\web-app`
 

@@ -29,7 +29,7 @@ Design tokens (one `theme.ts`): `#7C5CFF` primary · `#14121B` canvas · radii 9
 
 ## App location (per `AGENTS.md`)
 
-Expo project root = `mobile/android` → the generated native folder will be `mobile/android/android`. Honors the repo rule as written; flag to user if you'd rather have app at `mobile/` (one-line change before P0 scaffold).
+Expo app root = `mobile/` (JS, config, assets). `expo run:android` generates the native Gradle project at exactly `mobile/android` — the repo's "Android app ⇒ `.\mobile\android`" rule, no `android/android` doubling.
 
 ## Phases — each ends with a working app on the emulator
 
@@ -64,7 +64,7 @@ Error/empty states, a11y labels, resume-after-kill of the compression job, final
 
 ```powershell
 # once per machine, first build (compiles native, ~5-10 min):
-cd mobile\android
+cd mobile
 npx expo run:android          # installs on emulator-5554, starts Metro
 
 # every later session (JS-only, seconds):
