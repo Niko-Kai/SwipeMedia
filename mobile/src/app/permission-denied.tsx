@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Btn, Card, HeaderRow, Screen } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
 
-/** 00a permission denied (user_flow.md §2) */
+/** 00a permission denied (user_flow.md v4 §2) */
 const STEPS = ['open settings', 'apps → swipe media', 'permissions → photos & videos'];
 
 export default function PermissionDenied() {
@@ -61,11 +61,10 @@ const s = StyleSheet.create({
     height: 22,
     width: 22,
     borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepNumLabel: { fontSize: 11, fontWeight: '700', color: colors.primary, fontFamily: 'Inter' },
+  stepNumLabel: { fontSize: 11, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter' },
   footnote: { textAlign: 'left', marginBottom: space.xl },
 });

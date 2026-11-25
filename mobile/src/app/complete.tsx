@@ -5,7 +5,7 @@ import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { session } from '@/mock/ledger';
 
-/** 05b complete — reward and share (user_flow.md §2).
+/** 04b complete — reward and share (user_flow.md v4 §2).
  *  Share card is drawn to cacheDir via FileProvider in P3; never to the camera roll. */
 export default function Complete() {
   const router = useRouter();
@@ -79,6 +79,6 @@ const s = StyleSheet.create({
   bigCaption: { fontFamily: 'Inter', fontSize: 15, fontWeight: '500', color: colors.onPrimary },
   meterLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xs },
   cardMeta: { fontFamily: 'Inter', fontSize: 12, fontWeight: '500', color: colors.onPrimary },
-  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
+  cardFooterRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xxl },
   footer: { marginTop: 'auto', marginBottom: space.lg, paddingTop: space.lg },
 });

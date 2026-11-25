@@ -37,7 +37,7 @@ They interlock: a bug fix goes root cause (`systematic-debugging`) → reproduci
 
 ## Design & user flow sources
 
-- UI designs: `.\dev-data\v3.figcraft` — follow the designs on page **2 - Nov 11 2026 - v2**.
+- UI designs: `.\dev-data\v3.figcraft` — follow the designs on page **4 - Nov 25 2026 - v4**.
 - User flow: `.\dev-data\user_flow.md`
 
 Always check these before implementing any screen or feature; they define the product's flows, copy, and visual system.

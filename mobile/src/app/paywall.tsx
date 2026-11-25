@@ -1,87 +1,110 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Btn, Screen } from '@/components/ui';
-import { colors, space, type } from '@/theme/tokens';
+import { Btn } from '@/components/ui';
+import { colors, radius, space, type } from '@/theme/tokens';
 import { paywall } from '@/mock/ledger';
 
-/** 06 paywall — modal over the caller (user_flow.md §2).
- *  30-day trash + restore is free for everyone; Pro sells volume + compression. */
+/** 05 paywall — sheet over a dimmed caller (user_flow.md v4 §2).
+ *  Drawn as what it is: the caller stays behind a scrim, offers in a rounded
+ *  bottom sheet (same grammar as the 01a calendar sheet). 30-day trash + restore
+ *  is free for everyone; pro sells volume + compression. */
 export default function Paywall() {
   const router = useRouter();
   return (
-    <Screen>
-      <View style={s.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="close">
-          <Ionicons name="close" size={24} color={colors.text} />
-        </Pressable>
-        <View style={s.proBadge}>
-          <Text style={s.proLabel}>PRO</Text>
+    <View style={s.backdrop}>
+      <Pressable style={s.backdropTouch} onPress={() => router.back()} />
+      <View style={s.sheet}>
+        <View style={s.grabberWrap}>
+          <View style={s.grabber} />
         </View>
-        <View style={{ width: 24 }} />
-      </View>
+        <ScrollView contentContainerStyle={s.sheetScroll}>
 
-      <Text style={[type.title, { fontSize: 28, marginTop: space.xl }]}>clean without limits</Text>
-      <Text style={[type.body, { color: colors.muted, marginTop: space.xs }]}>
-        unlimited cleanups and max-savings compression, without daily caps.
-      </Text>
+        {/* v4: close X on its own row, top-right of the sheet */}
+        <View style={s.closeRow}>
+          <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="close">
+            <Ionicons name="close" size={22} color={colors.text} />
+          </Pressable>
+        </View>
 
-      <View style={{ marginTop: space.xl, gap: space.md }}>
-        {paywall.benefits.map((benefit) => (
-          <View key={benefit} style={s.benefitRow}>
-            <Ionicons name="checkmark" size={16} color={colors.primary} />
-            <Text style={[type.body, { color: colors.text }]}>{benefit}</Text>
+        <View style={s.headerRow}>
+          <View style={s.proBadge}>
+            <Text style={s.proLabel}>pro</Text>
           </View>
-        ))}
-      </View>
+          <Text style={[type.body, { fontWeight: '600', color: colors.text, flex: 1 }]}>clean without limits</Text>
+        </View>
+        <Text style={[type.meta, { marginTop: space.xs }]}>unlimited cleanups and max-savings compression.</Text>
 
-      <View style={{ marginTop: space.xl, gap: space.sm }}>
-        {paywall.plans.map((plan) => (
-          <View key={plan.id} style={plan.selected ? s.planSelected : s.plan}>
-            <View style={{ flex: 1 }}>
-              <Text style={[type.body, { fontWeight: '600', color: plan.selected ? colors.primary : colors.text }]}>
-                {plan.label}
-              </Text>
-              <Text style={type.meta}>{plan.price}</Text>
-              {plan.sub ? <Text style={type.meta}>{plan.sub}</Text> : null}
+        <View style={{ marginTop: space.lg, gap: space.sm }}>
+          {paywall.benefits.map((benefit) => (
+            <View key={benefit} style={s.benefitRow}>
+              <Ionicons name="checkmark" size={16} color={colors.primary} />
+              <Text style={[type.body, { color: colors.text }]}>{benefit}</Text>
             </View>
-            {plan.id === 'annual' && (
-              <View style={s.saveChip}>
-                <Text style={s.saveChipLabel}>save 85%</Text>
+          ))}
+        </View>
+
+        <View style={{ marginTop: space.lg, gap: space.sm }}>
+          {paywall.plans.map((plan) => (
+            <View key={plan.id} style={plan.selected ? s.planSelected : s.plan}>
+              <View style={{ flex: 1 }}>
+                <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>
+                  {plan.label}
+                </Text>
+                <Text style={type.meta}>{plan.price}</Text>
+                {plan.sub ? <Text style={type.meta}>{plan.sub}</Text> : null}
               </View>
-            )}
-            <View style={plan.selected ? s.radioOuterSelected : s.radioOuter}>
-              {plan.selected && <View style={s.radioInnerDot} />}
+              {plan.id === 'annual' && (
+                <View style={s.saveChip}>
+                  <Text style={s.saveChipLabel}>save 85%</Text>
+                </View>
+              )}
+              <View style={plan.selected ? s.radioOuterSelected : s.radioOuter}>
+                {plan.selected && <View style={s.radioInnerDot} />}
+              </View>
             </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      <View style={s.footer}>
         <Btn label="continue" onPress={() => router.back()} />
-        <Text style={[type.meta, { textAlign: 'center' }]}>google play billing · cancel anytime</Text>
-        <Text style={[type.body, { color: colors.primary, textAlign: 'center' }]} onPress={() => {}}>
+        <Text style={[type.meta, { textAlign: 'center', marginTop: space.md }]}>google play billing · cancel anytime</Text>
+        <Text style={[type.body, { color: colors.text, textAlign: 'center', marginTop: space.xs }]} onPress={() => {}}>
           restore purchases
         </Text>
-        <Text style={[type.micro, { textAlign: 'center' }]}>terms · privacy · refunds</Text>
+        <Text style={[type.micro, { textAlign: 'center', marginTop: space.xs, marginBottom: space.lg }]}>terms · privacy · refunds</Text>
+        </ScrollView>
       </View>
-    </Screen>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  header: {
-    height: 56,
+  backdrop: { flex: 1, backgroundColor: 'rgba(20, 18, 27, 0.72)', justifyContent: 'flex-end' },
+  backdropTouch: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
+  sheet: {
+    backgroundColor: colors.canvas,
+    borderTopLeftRadius: radius.frame,
+    borderTopRightRadius: radius.frame,
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+    maxHeight: '94%',
+  },
+  grabberWrap: { alignItems: 'center', paddingVertical: space.xs },
+  grabber: { width: 44, height: 5, borderRadius: 999, backgroundColor: colors.border },
+  sheetScroll: { paddingBottom: space.xl },
+  closeRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: space.xs },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: space.md,
+    marginTop: space.xs,
   },
   proBadge: {
     borderWidth: 1.5,
     borderColor: colors.primary,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   proLabel: { fontFamily: 'Inter', fontSize: 11, fontWeight: '700', color: colors.text, letterSpacing: 1.5 },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
@@ -123,5 +146,4 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   radioInnerDot: { height: 6, width: 6, borderRadius: 999, backgroundColor: colors.onPrimary },
-  footer: { marginTop: 'auto', marginBottom: space.lg, gap: space.sm, paddingTop: space.xl },
 });

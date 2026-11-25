@@ -67,7 +67,11 @@ export const applying = {
     progress: 0.6,
     indexLabel: 'video 3 of 12 · 60%',
   },
-  upNext: ['IMG_2518.MOV 96.3 MB', 'IMG_2522.MOV 41.2 MB', '+ 8 more'],
+  upNext: [
+    { name: 'IMG_2518.MOV', size: '96.3 MB' },
+    { name: 'IMG_2522.MOV', size: '41.2 MB' },
+    { name: null },
+  ],
   estimate: 'estimated 1:40 left',
   total: '600 MB total',
 };
@@ -78,9 +82,9 @@ export const trash = {
   rows: [
     { id: 1, name: 'IMG_2494.MOV', sizeMB: 48.6, daysLeft: 29 },
     { id: 2, name: 'IMG_2481.HEIC', sizeMB: 4.2, daysLeft: 29 },
-    { id: 3, name: 'Screenshot_0623', sizeMB: 2.8, daysLeft: 29 },
-    { id: 4, name: 'IMG_2470.HEIC', sizeMB: 6.1, daysLeft: 29 },
-    { id: 5, name: 'IMG_2455.MOV', sizeMB: 96.3, daysLeft: 29 },
+    { id: 3, name: 'Screenshot_0623', sizeMB: 2.8, daysLeft: 28 },
+    { id: 4, name: 'IMG_2470.HEIC', sizeMB: 6.1, daysLeft: 27 },
+    { id: 5, name: 'IMG_2455.MOV', sizeMB: 96.3, daysLeft: 26 },
   ],
   showing: 'showing 5 of 36 · newest first',
 };
@@ -96,7 +100,7 @@ export const calendar = {
 
 export const paywall = {
   plans: [
-    { id: 'annual', label: 'annual', price: '$24.99 / year', sub: '$2.08 / month — save 85%', selected: true },
+    { id: 'annual', label: 'annual', price: '$24.99 / year · $2.08 / month', sub: '', selected: true },
     { id: 'weekly', label: 'weekly', price: '$3.99 / week', sub: '', selected: false },
     { id: 'lifetime', label: 'lifetime', price: '$49.99 once', sub: '', selected: false },
   ],

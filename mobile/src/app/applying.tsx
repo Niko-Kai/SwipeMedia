@@ -1,22 +1,22 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Btn, Card, HeaderRow, MeterBar, Screen } from '@/components/ui';
+import { Card, HeaderRow, MeterBar, Screen } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
-import { formatBytes } from '@/lib/bytes';
-import { applying } from '@/mock/ledger';
+import { MB, applying } from '@/mock/ledger';
 
-/** 05a applying — foreground progress (user_flow.md §2).
- *  P3 renders the removal-only path; P4 adds the real compression jobs. */
+/** 04a applying — foreground progress (user_flow.md v4 §2).
+ *  No close X — cancel cleanup is the only exit. P3 renders the removal-only path;
+ *  P4 adds the real compression jobs. */
 export default function Applying() {
   const router = useRouter();
   return (
     <Screen scroll>
+      {/* v4: no close X — cancel cleanup at the bottom is the only exit */}
       <HeaderRow
         back={false}
         titleAlign="left"
         title="applying cleanup"
-        right={<Text style={[type.body, { color: colors.muted }]} onPress={() => router.back()}>✕</Text>}
       />
 
       <View style={s.headRow}>
@@ -29,9 +29,7 @@ export default function Applying() {
       <Text style={type.meta}>{applying.ofLabel}</Text>
       <View style={{ marginTop: space.md }}>
         <MeterBar progress={applying.overall} height={12} />
-        <Text style={[type.meta, { marginTop: space.xs }]}>
-          {applying.current.indexLabel.split(' · ')[0].replace('video', 'of')} · {formatBytes(applying.freedSoFarBytes)} freed so far
-        </Text>
+        <Text style={[type.meta, { marginTop: space.xs }]}>{Math.round(applying.freedSoFarBytes / MB)} MB freed so far</Text>
       </View>
 
       <Text style={[type.body, { color: colors.muted, marginTop: space.lg }]}>
@@ -41,9 +39,10 @@ export default function Applying() {
       <Card style={{ marginTop: space.sm }}>
         <View style={s.jobHead}>
           <View style={s.jobThumb}>
-            <Ionicons name="play" size={14} color={colors.onPrimary} />
+            <Ionicons name="play" size={14} color={colors.muted} />
           </View>
           <View style={{ flex: 1 }}>
+            <Text style={type.meta}>now compressing</Text>
             <Text style={[type.body, { color: colors.text }]}>{applying.current.name}</Text>
             <Text style={type.meta}>
               {applying.current.fromMB} MB → {applying.current.toMB} MB
@@ -58,17 +57,22 @@ export default function Applying() {
         <View style={[s.divider, { marginVertical: space.lg }]} />
 
         <Text style={[type.body, { color: colors.muted }]}>up next</Text>
-        {applying.upNext.map((item) => (
-          <Text key={item} style={type.meta}>{item}</Text>
+        {applying.upNext.map((item, i) => (
+          <View key={i} style={s.upNextRow}>
+            <Text style={type.meta}>{item.name ?? '+ 8 more'}</Text>
+            {item.size && <Text style={type.meta}>{item.size}</Text>}
+          </View>
         ))}
         <View style={s.estimateRow}>
-          <Text style={type.meta}>{applying.estimate}</Text>
+          <Text style={type.meta}>about 1:40 left</Text>
           <Text style={type.meta}>{applying.total}</Text>
         </View>
       </Card>
 
       <View style={s.noteCard}>
-        <Ionicons name="flash" size={16} color={colors.primary} />
+        <View style={s.noteSwatch}>
+          <Ionicons name="flash" size={14} color={colors.primary} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={[type.body, { color: colors.text }]}>keeps running in the background</Text>
           <Text style={[type.meta, {}]}>
@@ -78,13 +82,10 @@ export default function Applying() {
       </View>
 
       <View style={s.footer}>
-        <Btn label="cancel cleanup" tone="ghost" onPress={() => router.back()} />
-        {/* P3 removes this: finishing follows from the job, not a button */}
-        <Text
-          style={[type.meta, { textAlign: 'center', textDecorationLine: 'underline', marginTop: space.md }]}
-          onPress={() => router.replace('/complete')}>
-          finish →
-        </Text>
+        {/* the only exit (v4) */}
+        <Pressable onPress={() => router.back()} hitSlop={8}>
+          <Text style={[type.body, { color: colors.text, textAlign: 'center' }]}>cancel cleanup</Text>
+        </Pressable>
       </View>
     </Screen>
   );
@@ -108,20 +109,31 @@ const s = StyleSheet.create({
     height: 36,
     width: 36,
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
+  upNextRow: { flexDirection: 'row', justifyContent: 'space-between' },
   estimateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   noteCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
     backgroundColor: colors.primarySoft,
-    borderRadius: 999,
+    borderRadius: 20,
     padding: space.lg,
     marginTop: space.lg,
+  },
+  noteSwatch: {
+    height: 32,
+    width: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(124, 92, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footer: { marginTop: 'auto', marginBottom: space.lg, paddingTop: space.xl },
 });

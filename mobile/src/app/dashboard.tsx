@@ -6,27 +6,28 @@ import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { highYieldScopes, dateScopes as mockScopes, savedSoFarGB, storage } from '@/mock/ledger';
 
-const SCOPE_ICONS: Record<string, string> = {
-  videos: 'play-circle-outline',
-  screenshots: 'images-outline',
-};
+/** 01 dashboard — storage and scope (user_flow.md v4 §2) */
 
-/** 02 dashboard — storage and scope (user_flow.md §2) */
+/** 01 dashboard — storage and scope (user_flow.md v4 §2) */
 export default function Dashboard() {
   const router = useRouter();
   return (
     <Screen scroll>
-      {/* header: wordmark left · trash count, trash, gear, PRO right (spec) */}
+      {/* header: wordmark left · trash count, trash, gear, pro right (spec) */}
       <View style={s.header}>
         <Text style={s.wordmark}>swipe media</Text>
         <View style={s.headerRight}>
-          <Pressable onPress={() => router.push('/trash')} hitSlop={8}>
-            <Text style={type.meta}>trash (36)</Text>
-          </Pressable>
-          <Ionicons name="trash-outline" size={22} color={colors.text} accessibilityLabel="open trash" onPress={() => router.push('/trash')} />
-          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
           <Pressable onPress={() => router.push('/paywall')} hitSlop={8} accessibilityLabel="pro">
-            <Pill label="PRO" tone="primary" />
+            <Pill label="pro" tone="primary" />
+          </Pressable>
+          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
+          <Pressable onPress={() => router.push('/trash')} hitSlop={8} accessibilityLabel="open trash">
+            <View style={s.trashBadgeWrap}>
+              <Ionicons name="trash-outline" size={22} color={colors.text} />
+              <View style={s.trashBadge}>
+                <Text style={s.trashBadgeLabel}>36</Text>
+              </View>
+            </View>
           </Pressable>
         </View>
       </View>
@@ -55,9 +56,21 @@ export default function Dashboard() {
             style={[s.cardBase, { flex: 1 }]}
             onPress={() => router.push(scope.id === 'screenshots' ? '/gallery' : '/swipe')}
           >
-            <Ionicons name={(SCOPE_ICONS[scope.id] ?? 'help-circle-outline') as never} size={28} color={colors.primary} />
+            {scope.id === 'videos' ? (
+              /* v4: real video thumbnail 36×27 (mock block until P1 real media) */
+              <View style={s.videoThumb}>
+                <Ionicons name="play" size={10} color={colors.onPrimary} />
+              </View>
+            ) : (
+              /* v4: 2×2 mini-grid of screenshots, 16×12 each (mock until P1) */
+              <View style={s.miniGrid}>
+                {[0, 1, 2, 3].map((n) => (
+                  <View key={n} style={s.miniGridCell} />
+                ))}
+              </View>
+            )}
             <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>{scope.label}</Text>
-            <Text style={[type.meta, { color: colors.primary }]}>{scope.detail} · {formatBytes(scope.bytes)}</Text>
+            <Text style={type.meta}>{scope.detail} · {formatBytes(scope.bytes)}</Text>
           </Pressable>
         ))}
       </View>
@@ -77,15 +90,16 @@ export default function Dashboard() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={[type.body, { color: selected ? colors.text : colors.muted }]}>{scope.label}</Text>
-                <Text style={type.meta}>
-                  {scope.detail}{scope.bytes !== undefined ? ` — ${formatBytes(scope.bytes)}` : ' — choose'}
-                </Text>
+                <Text style={type.meta}>{scope.detail}</Text>
               </View>
-              {scope.id === 'range' ? (
-                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              {scope.bytes !== undefined ? (
+                <Text style={[type.body, { fontWeight: '700', color: selected ? colors.primary : colors.text }]}>
+                  {formatBytes(scope.bytes)}
+                </Text>
               ) : (
-                <View style={selected ? s.radioSelected : s.radio} />
+                <Text style={type.meta}>choose</Text>
               )}
+              <View style={selected ? s.radioSelected : s.radio} />
             </Pressable>
           );
         })}
@@ -106,7 +120,21 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   wordmark: { ...type.body, fontWeight: '700', fontSize: 18 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: space.lg },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  trashBadgeWrap: { position: 'relative' },
+  trashBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  trashBadgeLabel: { fontSize: 9, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter' },
   figure: { gap: space.xs, marginTop: space.lg, marginBottom: space.lg },
   meter: {
     flexDirection: 'row',
@@ -123,6 +151,25 @@ const s = StyleSheet.create({
     borderRadius: radius.card,
     padding: space.lg,
     gap: space.sm,
+  },
+  videoThumb: {
+    height: 27,
+    width: 36,
+    borderRadius: 8,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
+  miniGridCell: {
+    height: 12,
+    width: 16,
+    borderRadius: 3,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   list: { marginTop: space.md, gap: space.sm },
   scopeRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

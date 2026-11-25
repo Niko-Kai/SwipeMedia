@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card, HeaderRow, Screen } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
 
-/** 02c settings — compression + privacy (user_flow.md §2) */
+/** 01c settings — compression + privacy (user_flow.md v4 §2) */
 export default function Settings() {
   const router = useRouter();
   return (
@@ -18,7 +18,11 @@ export default function Settings() {
             <Text style={[type.body, { color: colors.text }]}>balanced</Text>
             <Text style={type.meta}>1080p · keeps quality</Text>
           </View>
-          <View style={s.radioSelected} />
+            <View style={s.radioCenter}>
+              <View style={s.radioSelected}>
+                <View style={s.radioInnerDot} />
+              </View>
+            </View>
         </Pressable>
         <Pressable style={s.presetRow}>
           <View style={{ flex: 1 }}>
@@ -79,8 +83,24 @@ const s = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  radio: { height: 16, width: 16, borderRadius: 999, borderWidth: 1.5, borderColor: colors.border },
-  radioSelected: { height: 16, width: 16, borderRadius: 999, backgroundColor: colors.primary },
+  radio: {
+    height: 18,
+    width: 18,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.muted,
+  },
+  radioSelected: {
+    height: 18,
+    width: 18,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInnerDot: { height: 8, width: 8, borderRadius: 999, backgroundColor: colors.primary },
+  radioCenter: { alignSelf: 'center' },
   splitRow: { flexDirection: 'row', alignItems: 'center' },
   splitCell: { flex: 1, paddingVertical: space.xs },
   splitDivider: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: 'stretch' },

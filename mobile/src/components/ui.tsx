@@ -147,7 +147,7 @@ const s = StyleSheet.create({
     paddingHorizontal: space.xl,
   },
   btnPrimary: { backgroundColor: colors.primary },
-  btnDanger: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.danger },
+  btnDanger: { backgroundColor: 'rgba(255, 107, 107, 0.10)', borderWidth: 1.5, borderColor: colors.danger },
   btnGhost: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.border },
   btnPressed: { opacity: 0.8 },
   btnPrimaryLabel: { color: colors.onPrimary, fontWeight: '600' },

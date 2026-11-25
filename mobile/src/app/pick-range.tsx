@@ -5,7 +5,7 @@ import { Btn } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { calendar } from '@/mock/ledger';
 
-/** 02a pick a range — month calendar sheet (user_flow.md §2).
+/** 01a pick a range — month calendar sheet (user_flow.md v4 §2).
  *  June 2026 starts Monday; range 15–18: endpoints solid violet, interior tinted,
  *  today 23 outlined, trailing July days dimmed. P1 swaps the mock for real month math. */
 const [startDay, endDay] = calendar.selectedRange;

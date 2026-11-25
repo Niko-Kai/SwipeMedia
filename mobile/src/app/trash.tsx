@@ -6,7 +6,7 @@ import { colors, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { trash } from '@/mock/ledger';
 
-/** 02b trash — the 30-day safety net (user_flow.md §2).
+/** 01b trash — the 30-day safety net (user_flow.md v4 §2).
  *  Restore is free for everyone; trashed files still occupy storage. */
 export default function Trash() {
   const router = useRouter();
@@ -24,7 +24,11 @@ export default function Trash() {
         {trash.rows.map((row, i) => (
           <View key={row.id} style={[s.row, i > 0 && s.rowDivider]}>
             <View style={s.thumb}>
-              <Ionicons name="image-outline" size={16} color={colors.muted} />
+              {row.name.endsWith('.MOV') ? (
+                <Ionicons name="play" size={14} color={colors.muted} />
+              ) : (
+                <Ionicons name="image" size={14} color={colors.muted} />
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[type.body, { color: colors.text }]}>{row.name}</Text>
@@ -34,8 +38,7 @@ export default function Trash() {
               <View style={s.daysChip}>
                 <Text style={s.daysLabel}>{row.daysLeft}d left</Text>
               </View>
-              <Pressable style={s.restoreBtn} onPress={() => router.push('/dashboard')} accessibilityLabel={`restore ${row.name}`}>
-                <Ionicons name="arrow-undo-outline" size={16} color={colors.primary} />
+              <Pressable onPress={() => router.push('/dashboard')} accessibilityLabel={`restore ${row.name}`}>
                 <Text style={s.restoreLabel}>restore</Text>
               </Pressable>
             </View>
@@ -43,10 +46,10 @@ export default function Trash() {
         ))}
       </Card>
 
-      <Text style={[type.micro, { marginTop: space.md }]}>{trash.showing}</Text>
+      <Text style={[type.meta, { marginTop: space.md }]}>{trash.showing}</Text>
 
-      <Text style={[type.body, { color: colors.muted, marginTop: space.lg }]}>
-        these files still use android storage until deleted.
+      <Text style={[type.meta, { marginTop: space.md }]}>
+        these still take up space until you empty the trash.
       </Text>
 
       <Text
@@ -66,7 +69,7 @@ export default function Trash() {
 
 const s = StyleSheet.create({
   summary: { marginBottom: space.lg },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.lg },
   rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   thumb: {
     width: 44,
@@ -76,15 +79,14 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowRight: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  rowRight: { flexDirection: 'column', alignItems: 'flex-end', gap: 6 },
   daysChip: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.cardAlt,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
   daysLabel: { fontSize: 11, fontWeight: '600', color: colors.primary, fontFamily: 'Inter' },
-  restoreBtn: { alignItems: 'center', justifyContent: 'center', gap: 2 },
-  restoreLabel: { fontSize: 11, fontWeight: '600', color: colors.primary, fontFamily: 'Inter' },
+  restoreLabel: { fontSize: 13, fontWeight: '500', color: colors.muted, fontFamily: 'Inter' },
   footer: { marginTop: 'auto', marginBottom: space.lg, paddingTop: space.lg },
 });

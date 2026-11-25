@@ -7,7 +7,7 @@ export const colors = {
   cardAlt: '#252134',
   border: '#2E2942',
   text: '#F4F2FB',
-  muted: '#A9A4BE',
+  muted: '#AFA7C6',
   primary: '#7C5CFF',
   primarySoft: 'rgba(124, 92, 255, 0.18)',
   onPrimary: '#FFFFFF',

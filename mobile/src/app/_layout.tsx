@@ -27,8 +27,8 @@ export default function RootLayout() {
           animation: 'slide_from_right',
         }}
       >
-        {/* 06 paywall — full-screen modal that returns to its caller (spec) */}
-        <Stack.Screen name="paywall" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+        {/* 05 paywall — sheet over a dimmed caller (spec); 01a sheet grammar */}
+        <Stack.Screen name="paywall" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: 'transparent' } }} />
         {/* 02a pick a range — bottom sheet over a dimmed dashboard (spec) */}
         <Stack.Screen name="pick-range" options={{ presentation: 'transparentModal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: 'transparent' } }} />
       </Stack>

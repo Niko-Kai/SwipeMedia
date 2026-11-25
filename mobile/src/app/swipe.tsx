@@ -6,7 +6,7 @@ import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { deck } from '@/mock/ledger';
 
-/** 04 swipe — the core loop (user_flow.md §2).
+/** 03 swipe — the core loop (user_flow.md v4 §2).
  *  Design order: deck card first, progress below, legend pills, then actions.
  *  Gestures wire in P2; the legend shows only ← ↑ → (no down gesture in the spec). */
 export default function Swipe() {
@@ -20,9 +20,10 @@ export default function Swipe() {
       />
 
       {/* media card inset 24 px from the screen edges on a stacked deck (spec).
-         04a/04b render as overlay states of this card in P2. */}
+         The card fills the deck area — media is the hero (v4). */}
       <View style={s.deckArea}>
         <View style={s.mediaCard}>
+          {/* stamp pressed onto the media, top-center (v4) */}
           <View style={s.stampWrap}>
             <Text style={s.stamp}>↑ remove</Text>
           </View>
@@ -46,21 +47,21 @@ export default function Swipe() {
 
       <View style={s.legend}>
         <View style={s.legendPill}><Text style={s.legendPlain}>← previous</Text></View>
-        <View style={s.legendPill}><Text style={s.legendPlain}>→ next</Text></View>
+        <View style={s.legendPill}><Text style={s.legendPlain}>→ keep</Text></View>
         <View style={[s.legendPill, s.legendPillPrimary]}><Text style={s.legendPrimary}>↑ remove</Text></View>
       </View>
+      {/* v4: legend reads "keep", not "next" */}
 
       <View style={s.controls}>
+        <View style={{ width: 44 }} />
+        {/* v4: undo centered, compress is the violet primary on the right */}
         <Pressable style={s.iconBtn} accessibilityLabel="undo">
           <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
         </Pressable>
-        <Pressable style={s.iconBtn} accessibilityLabel="compress" onPress={() => router.push('/paywall')}>
-          <Ionicons name="download-outline" size={20} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1 }} />
-        {/* P0 stand-in for the swipe-right commit affordance; P2 replaces with the deck gesture */}
-        <Pressable style={s.primaryBtn} accessibilityLabel="deck finished" onPress={() => router.push('/confirm')}>
-          <Ionicons name="chevron-down" size={26} color={colors.onPrimary} />
+        {/* P0 stub: compress opens the paywall (spec: over limit -> 05);
+            P4 wires real compression here */}
+        <Pressable style={s.primaryBtn} accessibilityLabel="compress" onPress={() => router.push('/paywall')}>
+          <Ionicons name="contract" size={22} color={colors.onPrimary} />
         </Pressable>
       </View>
     </Screen>
@@ -74,7 +75,7 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   mediaCard: {
-    height: 300,
+    flex: 1,
     borderRadius: radius.card,
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -84,15 +85,15 @@ const s = StyleSheet.create({
   },
   cardBehind: {
     position: 'absolute',
-    top: 14,
-    left: space.sm,
-    right: space.sm,
-    height: 300,
+    top: 20,
+    left: 12,
+    right: 12,
+    bottom: -14,
     borderRadius: radius.card,
     backgroundColor: colors.cardAlt,
     zIndex: 1,
   },
-  stampWrap: { alignSelf: 'flex-end' },
+  stampWrap: { alignSelf: 'center', marginTop: space.md },
   stamp: {
     fontFamily: 'Inter',
     fontSize: 13,
@@ -103,7 +104,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  fileRow: { marginTop: 'auto', gap: 2 },
+  fileRow: { marginTop: 'auto', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   progressBlock: { marginTop: space.lg },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: space.xs },
   legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.lg, gap: space.sm },
@@ -120,14 +121,15 @@ const s = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
     paddingVertical: space.lg,
+    justifyContent: 'space-between',
   },
   iconBtn: {
     height: 44,
     width: 44,
     borderRadius: 999,
-    backgroundColor: colors.cardAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },

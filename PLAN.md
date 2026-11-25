@@ -1,6 +1,6 @@
 # Implementation Plan — Swipe Media (React Native / Expo dev build → Android emulator)
 
-Sources of truth: `dev-data/user_flow.md` (flows, screen detail, copy, global rules) · `dev-data/v3.figcraft` page **2 - Nov 11 2026 - v2** (visuals) · `AGENTS.md` (repo rules: expo-dev-client, `npx expo install`, `npx tsc --noEmit` after changes, TDD).
+Sources of truth: `dev-data/user_flow.md` v4 (flows, screen detail, copy, global rules — renumbered: dashboard `01`, gallery `02`, swipe `03`, confirm `04`, paywall `05`) · `dev-data/v3.figcraft` page **4 - Nov 25 2026 - v4** (visuals) · `AGENTS.md` (repo rules: expo-dev-client, `npx expo install`, `npx tsc --noEmit` after changes, TDD).
 Environment (verified): Node 26.4 · JDK 17 · Android SDK 36/37 · `emulator-5554` (Medium_Phone API 37 ⇒ every API-30+ MediaStore feature available) · push target `Niko-Kai/SwipeMedia`.
 
 ---
@@ -53,23 +53,23 @@ apply(session) →
 
 ### Screens ↔ spec ↔ phase map
 
-| Spec screen | Route file | Phase | Notes |
+| Spec screen (v4) | Route file | Phase | Notes |
 |---|---|---|---|
 | 00 landing | `landing.tsx` | P0 stub → P1 real | permission request via expo-media-library |
 | 00a permission denied | `permission-denied.tsx` | P1 | `Linking.openSettings()` deep-link, retry |
 | 00b empty deck | `empty-deck.tsx` | P1 | scope with 0 items |
-| 02 dashboard | `dashboard.tsx` | P1 | real MediaStore counts + StatFs storage bar |
-| 02a pick a range | `pick-range.tsx` | P1 | house 6×7 Monday-first month grid (per spec) |
-| 04/04a/04b swipe | `swipe.tsx` | P2 | up=remove · left=prev · right=keep; **no down gesture** |
-| 03 gallery | `gallery.tsx` | P2 | 3-col grid, tap-select, select-all, batch dock |
-| 02b trash | `trash.tsx` | P3 | our trash records + system trash state |
-| 05 confirm | `confirm.tsx` | P3 | totals from session selectors |
-| 05a applying | `applying.tsx` | P3 (removals) → P4 (compression) | |
-| 05b complete | `complete.tsx` | P3 | share card via cacheDir + FileProvider |
-| 02c settings | `settings.tsx` | P4 | compression presets, privacy copy, build string |
-| 06 paywall | `paywall.tsx` | P0 stub → P5 | modal over caller, returns to caller |
+| 01 dashboard | `dashboard.tsx` | P1 | real MediaStore counts + StatFs storage bar |
+| 01a pick a range | `pick-range.tsx` | P1 | house 6×7 Monday-first month grid (per spec) |
+| 03/03a/03b swipe | `swipe.tsx` | P2 | up=remove · left=prev · right=keep; **no down gesture** |
+| 02 gallery | `gallery.tsx` | P2 | 3-col grid, tap-select, select-all, batch dock |
+| 01b trash | `trash.tsx` | P3 | our trash records + system trash state |
+| 04 confirm | `confirm.tsx` | P3 | totals from session selectors |
+| 04a applying | `applying.tsx` | P3 (removals) → P4 (compression) | |
+| 04b complete | `complete.tsx` | P3 | share card via cacheDir + FileProvider |
+| 01c settings | `settings.tsx` | P4 | compression presets, privacy copy, build string |
+| 05 paywall | `paywall.tsx` | P0 sheet → P5 billing | sheet over a dimmed caller (v4), returns to caller |
 
-Design tokens (`theme/tokens.ts`, from the spec's design system): primary `#7C5CFF` · canvas `#14121B` · Inter only · lowercase copy (strings taken verbatim from `user_flow.md`) · radii 999 pills / 40 frames / 18–20 cards / 12 thumbs · one primary action per screen.
+Design tokens (`theme/tokens.ts`, from the spec's design system): primary `#7C5CFF` · canvas `#14121B` · Inter only · lowercase copy (strings taken verbatim from `user_flow.md` v4) · radii 999 pills / 40 frames / 18–20 cards / 12 thumbs · one primary action per screen · grays `#AFA7C6` and up at small sizes (v4 legibility rule).
 
 ---
 

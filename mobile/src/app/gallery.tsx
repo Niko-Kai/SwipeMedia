@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Btn, HeaderRow, Screen } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { gallery as mock } from '@/mock/ledger';
 
-/** 03 gallery — select by tapping (user_flow.md §2).
+/** 02 gallery — select by tapping (user_flow.md v4 §2).
  *  Full-bleed 3-column grid (chunked rows: immune to subpixel rounding),
  *  scrollable, with a floating selection dock over the bottom. P0 uses dark tiles;
  *  real thumbnails arrive in P1. */
@@ -44,7 +45,7 @@ export default function Gallery() {
   return (
     <Screen>
       <HeaderRow
-        back={false}
+        back
         right={
           <View style={{ flexDirection: 'row', gap: space.lg }}>
             <Ionicons name="checkbox-outline" size={22} color={colors.text} accessibilityLabel="select all" onPress={toggleSelectAll} />
@@ -83,21 +84,27 @@ export default function Gallery() {
         ))}
       </ScrollView>
 
-      {/* floating dock over the bottom (spec: scrim + dock) */}
-      <View style={s.dock}>
-        <View style={s.dockMeta}>
-          <Text style={[type.body, { color: colors.text }]}>{count} selected</Text>
-          <Text style={type.meta}>{formatBytes(selectedBytes)}</Text>
-        </View>
-        <View style={s.dockButtonsRow}>
-          <View style={{ flex: 1 }}>
-            <Btn label={`remove ${count}`} onPress={() => router.push('/confirm')} />
+      {/* gradient scrim + floating dock over the bottom (spec: "bottom gradient
+         scrim behind a floating dock"); tiles fade into the scrim as you scroll */}
+      <LinearGradient
+        colors={['rgba(20,18,27,0)', 'rgba(20,18,27,0.9)', '#14121B']}
+        locations={[0, 0.35, 0.65]}
+        style={s.dockScrim}>
+        <View style={s.dock}>
+          <View style={s.dockMeta}>
+            <Text style={[type.body, { color: colors.text }]}>{count} selected</Text>
+            <Text style={type.meta}>{formatBytes(selectedBytes)}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Btn label={`compress ${count}`} tone="ghost" onPress={() => router.push('/confirm')} />
+          <View style={s.dockButtonsRow}>
+            <View style={{ flex: 1 }}>
+              <Btn label={`remove ${count}`} onPress={() => router.push('/confirm')} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Btn label={`compress ${count}`} tone="ghost" onPress={() => router.push('/confirm')} />
+            </View>
           </View>
         </View>
-      </View>
+      </LinearGradient>
     </Screen>
   );
 }
@@ -105,7 +112,7 @@ export default function Gallery() {
 const s = StyleSheet.create({
   titleBlock: { marginTop: space.sm, marginBottom: space.sm },
   gridScroll: { flex: 1 },
-  gridContent: { paddingBottom: space.xl },
+  gridContent: { paddingBottom: 170 },
   gridRow: { flexDirection: 'row' },
   tile: {
     flex: 1,
@@ -130,13 +137,18 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   checkLabel: { color: colors.onPrimary, fontSize: 13, fontWeight: '700', fontFamily: 'Inter' },
-  dock: {
+  dockScrim: {
     position: 'absolute',
-    left: space.lg,
-    right: space.lg,
-    bottom: space.lg,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'flex-end',
+    pointerEvents: 'box-none',
+  },
+  dock: {
     backgroundColor: colors.cardAlt,
     borderRadius: radius.card,
+    margin: space.lg,
     padding: space.lg,
     gap: space.sm,
   },
