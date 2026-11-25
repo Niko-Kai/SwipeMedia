@@ -203,6 +203,13 @@ npx expo start --dev-client            # r reload · a device   npx tsc --noEmit
 # native/dependency change: npx expo install <pkg>, then expo run:android again
 ```
 
+Emulator/dev-build operational notes (verified on this box):
+- The adb daemon dies sporadically; if `expo run:android` reports "no connected device" or adb lost the emulator, run `adb start-server`, relaunch the AVD (`emulator -avd Medium_Phone_API_37.0`), wait for `sys.boot_completed=1`.
+- Deep-link a screen (works warm, bundle loaded): `adb shell am start -a android.intent.action.VIEW -d "swipemedia:///paywall" com.nikokai.swipemedia` — the ACTION_VIEW flag is required; action-less `-d` intents are ignored as restart attempts.
+- On first cold start the dev-client asks for a nearby-devices (Bluetooth) permission — dev-menu server discovery, not an app feature. Grant once (UI or `pm grant com.nikokai.swipemedia android.permission.BLUETOOTH_SCAN`).
+- After a force-stop, the dev-client shows its launcher; tap the Metro entry (http://<lan-ip>:8081) to (re)load the JS bundle.
+- The "Tools" floating button on screen is expo-dev-client's debug menu — present only in debug builds.
+
 Bugs follow the skills order (`AGENTS.md`): root cause (`systematic-debugging`) → failing test → minimal fix. New non-trivial logic = test-first.
 
 ## 6. Risks & spikes (in strike order)

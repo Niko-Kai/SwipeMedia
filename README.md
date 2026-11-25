@@ -2,12 +2,13 @@
 
 A swipe-based photo & video cleanup app for Android. Swipe through your library, remove what you don't need, compress the heavy stuff, and watch the storage come back — all on-device, with no account and no upload.
 
-> **Status:** design/spec stage. No application code yet — the repo currently holds the product spec and design sources.
+> **Status:** P0 shell shipped — Expo (SDK 58) app in `mobile/` runs on the Android emulator as a development build: all 15 spec screens rendered with the sample-data ledger, full flow navigation, gates (`tsc` · eslint · jest) green. Real media, gestures, trash/compression engines and billing follow per `PLAN.md` (P1–P6).
 
 ## Repo layout
 
 | Path | What it is |
 |---|---|
+| `mobile/` | Expo SDK 58 + React Native app (routes in `src/app/`, one per spec screen) |
 | `dev-data/user_flow.md` | Full product spec: flow map, screen-by-screen detail, global rules |
 | `dev-data/v3.figcraft` | FigCraft design source (UI mockups) |
 | `.agents/skills/` | Five skills agents load before working (usage map in `AGENTS.md`) |
