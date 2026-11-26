@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Card, HeaderRow, MeterBar, Pill, Screen, Toast } from '@/components/ui';
+import { Btn, Card, HeaderRow, MeterBar, Pill, Screen, Toast } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { useSession } from '@/features/session/session-context';
@@ -11,21 +11,25 @@ import { addTrashRows, addSaved } from '@/features/trashstore/trash';
 import type { TrashRow } from '@/features/trashstore/trash';
 import { requestTrash, compressVideo } from '../../modules/mediatools/src';
 
-type Stage = 'checking' | 'compressing' | 'trashing' | 'done' | 'denied' | 'failed';
+type Stage = 'starting' | 'compressing' | 'trashing' | 'done' | 'denied' | 'failed';
 
 /** 04a applying — the real apply pipeline (P3+P4).
- *  Compress staged videos on-device (MediaTransformer, foreground service),
- *  then ONE system dialog trashes every removal + every compressed original
- *  (spec: "one 'allow' at the end trashes all 36 items").
- *  Free plan: one cleanup a day -> 05 paywall when spent (spec). */
+ *  Compress staged videos on-device (MediaTransformer, foreground service), then
+ *  ONE system dialog trashes every removal + every compressed original.
+ *  Free plan: one cleanup a day — when spent, 05 opens as a modal and this screen
+ *  stays mounted underneath, so buying RESUMES the batch (spec 05). */
 export default function Applying() {
   const router = useRouter();
   const { state } = useSession();
   const { canCleanup, heightPx, recordCleanup } = useEntitlement();
-  const [stage, setStage] = useState<Stage>('checking');
+  const [stage, setStage] = useState<Stage>('starting');
+  const [started, setStarted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentName, setCurrentName] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const startedRef = useRef(false);
+  const upsellRef = useRef(false);
+  const aliveRef = useRef(true);
   const [nowMs] = useState(() => Date.now());
 
   const removedBytes = state.removed.reduce((sum, a) => sum + a.sizeBytes, 0);
@@ -33,44 +37,63 @@ export default function Applying() {
   const freedBytes = removedBytes + compressSaved;
   const batchCount = state.removed.length + state.compressed.length;
 
+  /** the free-tier gate is derived, not stored: the screen simply waits here */
+  const gated = !canCleanup && !started;
+
+  // cancellation only on unmount — never on a dependency change (that would
+  // abort the very pipeline the state change belongs to)
   useEffect(() => {
-    let active = true;
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+
     (async () => {
-      // free-tier gate (spec 05: apply over the limit opens the paywall)
+      // one tick of slack so the effect never sets state synchronously
+      await Promise.resolve();
+      if (!aliveRef.current) return;
+
       if (!canCleanup) {
-        router.replace('/paywall');
+        if (!upsellRef.current) {
+          upsellRef.current = true;
+          router.push('/paywall'); // spec: over the limit -> 05 modal, returns here
+        }
         return;
       }
-      if (batchCount === 0) {
-        setStage('done');
-        return;
-      }
+
+      startedRef.current = true;
+      setStarted(true);
+      setStage('starting');
+
       try {
         let realFreed = removedBytes;
         if (state.compressed.length > 0) {
           setStage('compressing');
           for (const [i, c] of state.compressed.entries()) {
-            if (!active) return;
+            if (!aliveRef.current) return;
             setCurrentName(c.item.filename);
             setProgress(i / state.compressed.length);
             const result = await compressVideo(c.item.uri, heightPx);
-            // only count a win when the copy is genuinely smaller; otherwise the
-            // original stays and nothing is claimed (never inflate the savings)
+            // only a genuinely smaller copy counts as a win
             const saved = c.item.sizeBytes - result.sizeBytes;
             if (saved > 0) realFreed += saved;
           }
         }
-        if (!active) return;
+        if (!aliveRef.current) return;
         setProgress(1);
         setStage('trashing');
 
-        // every removal + every compressed ORIGINAL in one dialog
+        // every removal + every compressed ORIGINAL in ONE dialog
         const uris = [
           ...state.removed.map((a) => a.id),
           ...state.compressed.map((c) => c.item.id),
         ];
         const result = await requestTrash(uris, true);
-        if (!active) return;
+        if (!aliveRef.current) return;
         if (!result.granted) {
           setStage('denied');
           setToast('the system trash dialog was declined — nothing was changed.');
@@ -89,22 +112,18 @@ export default function Applying() {
         await addTrashRows(rows);
         await addSaved(realFreed);
         await recordCleanup();
-        if (!active) return;
         setStage('done');
         router.replace('/complete');
       } catch (e) {
         console.error('apply failed', e);
-        if (active) {
+        if (aliveRef.current) {
           setStage('failed');
           setToast('the batch could not finish — nothing was trashed.');
         }
       }
     })();
-    return () => {
-      active = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canCleanup]);
 
   const label =
     stage === 'compressing' ? `of ${state.compressed.length} videos compressed`
@@ -112,36 +131,43 @@ export default function Applying() {
         : stage === 'done' ? 'finished'
           : stage === 'denied' ? 'needs allow'
             : stage === 'failed' ? 'stopped'
-              : 'starting…';
+              : gated ? 'free plan limit reached'
+                : 'starting…';
 
   return (
     <Screen scroll>
       <HeaderRow back={false} titleAlign="left" title="applying cleanup" />
 
       <View style={s.headRow}>
-        <Pill label={stage === 'denied' || stage === 'failed' ? 'needs attention' : 'in progress'} />
+        <Pill label={stage === 'denied' || stage === 'failed' ? 'needs attention' : gated ? 'pro required' : 'in progress'} />
       </View>
 
-      <Text style={[type.hero, { fontSize: 40, marginTop: space.lg }]}>{Math.round(progress * 100)}%</Text>
+      <Text style={[type.hero, { fontSize: 40, marginTop: space.lg }]}>
+        {gated ? '1 / day' : `${Math.round(progress * 100)}%`}
+      </Text>
       <Text style={type.meta}>{label}</Text>
       <View style={{ marginTop: space.md }}>
-        <MeterBar progress={progress} height={12} />
+        <MeterBar progress={gated ? 0 : progress} height={12} />
         <Text style={[type.meta, { marginTop: space.xs }]}>{formatBytes(freedBytes)} to free</Text>
       </View>
 
       <Card style={{ marginTop: space.xl }}>
         <View style={s.jobHead}>
           <View style={s.jobThumb}>
-            <Ionicons name="contract" size={14} color={colors.muted} />
+            <Ionicons name={gated ? 'lock-closed-outline' : 'contract'} size={14} color={colors.muted} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={type.meta}>
               {stage === 'compressing' ? 'now compressing' : stage === 'trashing' ? 'now trashing' : 'batch'}
             </Text>
             <Text style={[type.body, { color: colors.text }]} numberOfLines={1}>
-              {currentName ?? `${batchCount} items`}
+              {gated ? 'your free cleanup is used for today' : currentName ?? `${batchCount} items`}
             </Text>
-            <Text style={type.meta}>{`one 'allow' trashes all ${batchCount} items`}</Text>
+            <Text style={type.meta}>
+              {gated
+                ? 'buying pro resumes this batch automatically'
+                : `one 'allow' trashes all ${batchCount} items`}
+            </Text>
           </View>
         </View>
       </Card>
@@ -159,10 +185,25 @@ export default function Applying() {
       {toast && <View style={{ marginTop: space.lg }}><Toast msg={toast} /></View>}
 
       <View style={s.footer}>
-        {/* the only exit (v4) */}
-        <Pressable onPress={() => router.back()} hitSlop={8}>
-          <Text style={[type.body, { color: colors.text, textAlign: 'center' }]}>cancel cleanup</Text>
-        </Pressable>
+        {gated ? (
+          <>
+            <Btn
+              label="see pro"
+              onPress={() => {
+                upsellRef.current = true;
+                router.push('/paywall');
+              }}
+            />
+            <View style={{ height: space.sm }} />
+            <Pressable onPress={() => router.back()} hitSlop={8}>
+              <Text style={[type.body, { color: colors.text, textAlign: 'center' }]}>not now</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Text style={[type.body, { color: colors.text, textAlign: 'center' }]}>cancel cleanup</Text>
+          </Pressable>
+        )}
       </View>
     </Screen>
   );
