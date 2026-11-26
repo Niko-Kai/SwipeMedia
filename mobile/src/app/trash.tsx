@@ -112,6 +112,18 @@ export default function Trash() {
       <Text style={[type.meta, { marginTop: space.md }]}>
         these still take up space until you empty the trash.
       </Text>
+      {held.length > 5 && (
+        <Text style={[type.micro, { marginTop: space.xs }]}>
+          showing 5 of {held.length} · newest first
+        </Text>
+      )}
+      {held.length > 0 && (
+        <Text
+          style={[type.body, { color: colors.primary, marginTop: space.xs }]}
+          onPress={emptyTrash}>
+          {`empty trash to free ${formatBytes(bytes)} now →`}
+        </Text>
+      )}
 
       <View style={[s.footer, {}]}>
         <Btn label="empty trash now" tone="danger" onPress={emptyTrash} disabled={held.length === 0 || busy} />

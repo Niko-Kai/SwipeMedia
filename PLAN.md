@@ -1,5 +1,24 @@
 # Implementation Plan — Swipe Media (React Native / Expo dev build → Android emulator)
 
+## Phase status (as built)
+
+| Phase | State | Evidence |
+|---|---|---|
+| P0 shell + design parity | done | all screens at parity on the v4 board; `34b77d8` |
+| P1 real media | done | live: `today 9 items · 1.6 MB`, `screenshots 6 · 124.8 KB`, real StatFs bar |
+| P2 swipe deck | done | live: swipe up staged a removal, tally `0 B → 466.5 KB`, `1 of 8 → 2 of 8` |
+| P3 trash | done | live: one dialog "Allow swipe media to move 2 photos to trash?", ledger + badge + restore |
+| P4 compression | done (pipeline) | live: Media3 transcode wrote a real MP4 to `cache/compressed/`; foreground service ran |
+| P5 pro | done (contract) | live: free → pro flips copy and unlocks 720p; Play Billing adapter needs a Play device |
+| P6 hardening | partial | session snapshot/resume, error toasts, a11y labels done; device-matrix + release build outstanding |
+
+Known limits to pick up next:
+- Savings are only counted when a transcode output is genuinely smaller; tiny
+  screen recordings can transcode *larger*, so the test library shows 0 savings.
+- Play Billing is a stub behind the entitlement contract (`useEntitlement().purchase`).
+- The emulator on this host dies every 10–20 min; see the runbook in §5.
+
+
 Sources of truth: `dev-data/user_flow.md` v4 (flows, screen detail, copy, global rules — renumbered: dashboard `01`, gallery `02`, swipe `03`, confirm `04`, paywall `05`) · `dev-data/v3.figcraft` page **4 - Nov 25 2026 - v4** (visuals) · `AGENTS.md` (repo rules: expo-dev-client, `npx expo install`, `npx tsc --noEmit` after changes, TDD).
 Environment (verified): Node 26.4 · JDK 17 · Android SDK 36/37 · `emulator-5554` (Medium_Phone API 37 ⇒ every API-30+ MediaStore feature available) · push target `Niko-Kai/SwipeMedia`.
 

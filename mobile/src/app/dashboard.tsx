@@ -31,7 +31,7 @@ export default function Dashboard() {
   const freeGB = storage ? storage.freeBytes / 1024 ** 3 : 0;
 
   // real thumbnails for the high-yield cards (v4: media, not drawn glyphs)
-  const topVideo = assets.find((a) => a.mediaType === 'video');
+  const topVideo = stats.largeVideos.count > 0 ? assets.find((a) => a.mediaType === 'video' && a.sizeBytes > 50 * 1024 ** 2) : undefined;
   const screenshotThumbs = assets.filter((a) => isScreenshot(a)).slice(0, 4);
 
   const scopeCount = (id: ScopeId): number =>

@@ -101,7 +101,8 @@ export default function Swipe() {
         <View style={s.mediaCard}>
           {current ? (
             <>
-              <View style={s.stampWrap}>
+              {/* stamp + filename overlay the media (v4 draws them on the image) */}
+              <View style={s.overlayTop}>
                 <Text style={s.stamp}>↑ remove</Text>
               </View>
               <GestureDetector gesture={pan}>
@@ -116,7 +117,7 @@ export default function Swipe() {
                   )}
                 </View>
               </GestureDetector>
-              <View style={s.fileRow}>
+              <View style={s.overlayBottom}>
                 <Text style={[type.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>{current.filename}</Text>
                 <Text style={type.meta}>{formatBytes(current.sizeBytes)}</Text>
               </View>
@@ -174,13 +175,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: space.md,
-    zIndex: 2,
     overflow: 'hidden',
+    zIndex: 2,
   },
   mediaWrap: { flex: 1 },
-  media: { flex: 1, borderRadius: 14 },
-  mediaEmpty: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', marginTop: space.md, marginBottom: space.md },
+  media: { flex: 1 },
+  mediaEmpty: { flex: 1, backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center' },
   cardBehind: {
     position: 'absolute',
     top: 18,
@@ -192,6 +192,21 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
   stampWrap: { alignSelf: 'center' },
+  overlayTop: { position: 'absolute', top: space.lg, left: 0, right: 0, alignItems: 'center', zIndex: 3 },
+  overlayBottom: {
+    position: 'absolute',
+    left: space.lg,
+    right: space.lg,
+    bottom: space.lg,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: space.md,
+    zIndex: 3,
+    backgroundColor: 'rgba(20,18,27,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+  },
   stamp: {
     fontFamily: 'Inter',
     fontSize: 13,
