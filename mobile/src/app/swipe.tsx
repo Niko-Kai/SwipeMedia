@@ -10,6 +10,9 @@ import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
 import { useDashboardData } from '@/features/media/useDashboardData';
 import { useSession } from '@/features/session/session-context';
+import { useEntitlement } from '@/features/billing/entitlement-context';
+import { compressDecision } from '@/features/compress/decision';
+import { compressVideo } from '../../modules/mediatools/src';
 
 /** 03 swipe — the core loop with real gestures (P2).
  *  up = stage-remove · left = previous · right = keep/advance (spec; no down).
@@ -20,7 +23,9 @@ export default function Swipe() {
   const router = useRouter();
   const { todayAssets: queue, loading } = useDashboardData();
   const { state, start, dispatch, tally } = useSession();
+  const { pro, heightPx } = useEntitlement();
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
 
   useEffect(() => {
     if (!toastMsg) return;
@@ -44,6 +49,44 @@ export default function Swipe() {
 
   const current = state.queue[state.index];
   const stagedSaved = tally(0);
+
+  /** deck compress: pro transcode in place; free users get the upsell (spec 05). */
+  const compressCurrent = async () => {
+    if (compressing) return;
+    if (!pro) {
+      router.push('/paywall'); // spec 05: free users are upsold
+      return;
+    }
+    if (!current) return;
+    if (current.mediaType !== 'video') {
+      setToastMsg('compress works on videos');
+      return;
+    }
+
+    setCompressing(true);
+    try {
+      const result = await compressVideo(current.uri, heightPx);
+      const decision = compressDecision({
+        pro,
+        mediaType: current.mediaType,
+        originalBytes: current.sizeBytes,
+        resultBytes: result.sizeBytes,
+      });
+      if (decision.kind === 'staged') {
+        dispatch({ type: 'compress', item: current, newSizeBytes: decision.newSizeBytes });
+        setToastMsg(`video compressed · ${formatBytes(decision.savedBytes)} freed`);
+      } else {
+        dispatch({ type: 'keep' });
+        setToastMsg('already efficient — kept the original');
+      }
+      if (state.index + 1 >= state.queue.length) router.replace('/confirm');
+    } catch (e) {
+      console.error('deck compress failed', e);
+      setToastMsg('compression failed — nothing changed');
+    } finally {
+      setCompressing(false);
+    }
+  };
 
   const act = useCallback(
     (kind: 'remove' | 'keep' | 'previous') => {
@@ -153,8 +196,12 @@ export default function Swipe() {
         <Pressable style={s.iconBtn} accessibilityLabel="undo" onPress={() => dispatch({ type: 'undo' })}>
           <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
         </Pressable>
-        {/* compress stages once the engine lands (P4); over-limit opens pro (spec) */}
-        <Pressable style={s.primaryBtn} accessibilityLabel="compress" onPress={() => router.push('/paywall')}>
+        {/* compress the current card in place (pro); free users get the upsell */}
+        <Pressable
+          style={[s.primaryBtn, compressing && { opacity: 0.6 }]}
+          accessibilityLabel="compress"
+          disabled={compressing}
+          onPress={compressCurrent}>
           <Ionicons name="contract" size={22} color={colors.onPrimary} />
         </Pressable>
       </View>
