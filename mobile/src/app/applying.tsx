@@ -1,71 +1,148 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Card, HeaderRow, MeterBar, Screen } from '@/components/ui';
+import { Card, HeaderRow, MeterBar, Pill, Screen, Toast } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
-import { MB, applying } from '@/mock/ledger';
+import { formatBytes } from '@/lib/bytes';
+import { useSession } from '@/features/session/session-context';
+import { useEntitlement } from '@/features/billing/entitlement-context';
+import { addTrashRows, addSaved } from '@/features/trashstore/trash';
+import type { TrashRow } from '@/features/trashstore/trash';
+import { requestTrash, compressVideo } from '../../modules/mediatools/src';
 
-/** 04a applying — foreground progress (user_flow.md v4 §2).
- *  No close X — cancel cleanup is the only exit. P3 renders the removal-only path;
- *  P4 adds the real compression jobs. */
+type Stage = 'checking' | 'compressing' | 'trashing' | 'done' | 'denied' | 'failed';
+
+/** 04a applying — the real apply pipeline (P3+P4).
+ *  Compress staged videos on-device (MediaTransformer, foreground service),
+ *  then ONE system dialog trashes every removal + every compressed original
+ *  (spec: "one 'allow' at the end trashes all 36 items").
+ *  Free plan: one cleanup a day -> 05 paywall when spent (spec). */
 export default function Applying() {
   const router = useRouter();
+  const { state } = useSession();
+  const { canCleanup, heightPx, recordCleanup } = useEntitlement();
+  const [stage, setStage] = useState<Stage>('checking');
+  const [progress, setProgress] = useState(0);
+  const [currentName, setCurrentName] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [nowMs] = useState(() => Date.now());
+
+  const removedBytes = state.removed.reduce((sum, a) => sum + a.sizeBytes, 0);
+  const compressSaved = state.compressed.reduce((sum, c) => sum + (c.item.sizeBytes - c.newSizeBytes), 0);
+  const freedBytes = removedBytes + compressSaved;
+  const batchCount = state.removed.length + state.compressed.length;
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      // free-tier gate (spec 05: apply over the limit opens the paywall)
+      if (!canCleanup) {
+        router.replace('/paywall');
+        return;
+      }
+      if (batchCount === 0) {
+        setStage('done');
+        return;
+      }
+      try {
+        let realFreed = removedBytes;
+        if (state.compressed.length > 0) {
+          setStage('compressing');
+          for (const [i, c] of state.compressed.entries()) {
+            if (!active) return;
+            setCurrentName(c.item.filename);
+            setProgress(i / state.compressed.length);
+            const result = await compressVideo(c.item.uri, heightPx);
+            // only count a win when the copy is genuinely smaller; otherwise the
+            // original stays and nothing is claimed (never inflate the savings)
+            const saved = c.item.sizeBytes - result.sizeBytes;
+            if (saved > 0) realFreed += saved;
+          }
+        }
+        if (!active) return;
+        setProgress(1);
+        setStage('trashing');
+
+        // every removal + every compressed ORIGINAL in one dialog
+        const uris = [
+          ...state.removed.map((a) => a.id),
+          ...state.compressed.map((c) => c.item.id),
+        ];
+        const result = await requestTrash(uris, true);
+        if (!active) return;
+        if (!result.granted) {
+          setStage('denied');
+          setToast('the system trash dialog was declined — nothing was changed.');
+          return;
+        }
+        const rows: TrashRow[] = [
+          ...state.removed.map((a) => ({
+            id: a.id, uri: a.uri, filename: a.filename,
+            sizeBytes: a.sizeBytes, mediaType: a.mediaType, trashedAtMs: nowMs,
+          })),
+          ...state.compressed.map((c) => ({
+            id: c.item.id, uri: c.item.uri, filename: c.item.filename,
+            sizeBytes: c.item.sizeBytes, mediaType: c.item.mediaType, trashedAtMs: nowMs,
+          })),
+        ];
+        await addTrashRows(rows);
+        await addSaved(realFreed);
+        await recordCleanup();
+        if (!active) return;
+        setStage('done');
+        router.replace('/complete');
+      } catch (e) {
+        console.error('apply failed', e);
+        if (active) {
+          setStage('failed');
+          setToast('the batch could not finish — nothing was trashed.');
+        }
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const label =
+    stage === 'compressing' ? `of ${state.compressed.length} videos compressed`
+      : stage === 'trashing' ? 'trashing the batch'
+        : stage === 'done' ? 'finished'
+          : stage === 'denied' ? 'needs allow'
+            : stage === 'failed' ? 'stopped'
+              : 'starting…';
+
   return (
     <Screen scroll>
-      {/* v4: no close X — cancel cleanup at the bottom is the only exit */}
-      <HeaderRow
-        back={false}
-        titleAlign="left"
-        title="applying cleanup"
-      />
+      <HeaderRow back={false} titleAlign="left" title="applying cleanup" />
 
       <View style={s.headRow}>
-        <View style={s.statusPill}>
-          <View style={s.statusDot} />
-          <Text style={s.statusLabel}>in progress</Text>
-        </View>
+        <Pill label={stage === 'denied' || stage === 'failed' ? 'needs attention' : 'in progress'} />
       </View>
-      <Text style={[type.hero, { fontSize: 40, marginTop: space.lg }]}>{applying.overallLabel}</Text>
-      <Text style={type.meta}>{applying.ofLabel}</Text>
+
+      <Text style={[type.hero, { fontSize: 40, marginTop: space.lg }]}>{Math.round(progress * 100)}%</Text>
+      <Text style={type.meta}>{label}</Text>
       <View style={{ marginTop: space.md }}>
-        <MeterBar progress={applying.overall} height={12} />
-        <Text style={[type.meta, { marginTop: space.xs }]}>{Math.round(applying.freedSoFarBytes / MB)} MB freed so far</Text>
+        <MeterBar progress={progress} height={12} />
+        <Text style={[type.meta, { marginTop: space.xs }]}>{formatBytes(freedBytes)} to free</Text>
       </View>
 
-      <Text style={[type.body, { color: colors.muted, marginTop: space.lg }]}>
-        {applying.current.name === 'IMG_2510.MOV' ? 'compressing video 3 of 12' : ''}
-      </Text>
-
-      <Card style={{ marginTop: space.sm }}>
+      <Card style={{ marginTop: space.xl }}>
         <View style={s.jobHead}>
           <View style={s.jobThumb}>
-            <Ionicons name="play" size={14} color={colors.muted} />
+            <Ionicons name="contract" size={14} color={colors.muted} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={type.meta}>now compressing</Text>
-            <Text style={[type.body, { color: colors.text }]}>{applying.current.name}</Text>
             <Text style={type.meta}>
-              {applying.current.fromMB} MB → {applying.current.toMB} MB
+              {stage === 'compressing' ? 'now compressing' : stage === 'trashing' ? 'now trashing' : 'batch'}
             </Text>
+            <Text style={[type.body, { color: colors.text }]} numberOfLines={1}>
+              {currentName ?? `${batchCount} items`}
+            </Text>
+            <Text style={type.meta}>{`one 'allow' trashes all ${batchCount} items`}</Text>
           </View>
-        </View>
-        <View style={{ marginTop: space.md }}>
-          <MeterBar progress={applying.current.progress} />
-          <Text style={[type.meta, { marginTop: space.xs }]}>{applying.current.indexLabel}</Text>
-        </View>
-
-        <View style={[s.divider, { marginVertical: space.lg }]} />
-
-        <Text style={[type.body, { color: colors.muted }]}>up next</Text>
-        {applying.upNext.map((item, i) => (
-          <View key={i} style={s.upNextRow}>
-            <Text style={type.meta}>{item.name ?? '+ 8 more'}</Text>
-            {item.size && <Text style={type.meta}>{item.size}</Text>}
-          </View>
-        ))}
-        <View style={s.estimateRow}>
-          <Text style={type.meta}>about 1:40 left</Text>
-          <Text style={type.meta}>{applying.total}</Text>
         </View>
       </Card>
 
@@ -75,11 +152,11 @@ export default function Applying() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[type.body, { color: colors.text }]}>keeps running in the background</Text>
-          <Text style={[type.meta, {}]}>
-            {`android won't stop the job if you switch apps. one 'allow' at the end trashes all 36 items.`}
-          </Text>
+          <Text style={type.meta}>trash holds everything for 30 days — free for every plan.</Text>
         </View>
       </View>
+
+      {toast && <View style={{ marginTop: space.lg }}><Toast msg={toast} /></View>}
 
       <View style={s.footer}>
         {/* the only exit (v4) */}
@@ -93,17 +170,6 @@ export default function Applying() {
 
 const s = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', marginTop: space.md },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: colors.primarySoft,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  statusDot: { height: 6, width: 6, borderRadius: 999, backgroundColor: colors.primary },
-  statusLabel: { fontSize: 11, fontWeight: '600', color: colors.primary, fontFamily: 'Inter' },
   jobHead: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   jobThumb: {
     height: 36,
@@ -115,9 +181,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
-  upNextRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  estimateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   noteCard: {
     flexDirection: 'row',
     alignItems: 'center',

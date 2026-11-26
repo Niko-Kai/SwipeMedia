@@ -1,44 +1,62 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, HeaderRow, Screen } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
+import { useEntitlement } from '@/features/billing/entitlement-context';
 
 /** 01c settings — compression + privacy (user_flow.md v4 §2) */
 export default function Settings() {
   const router = useRouter();
+  const { preset, choosePreset, pro, restore } = useEntitlement();
+  const [note, setNote] = useState<string | null>(null);
+
+  const pickMax = () => {
+    if (!pro) {
+      router.push('/paywall'); // max savings is a pro capability (spec)
+      return;
+    }
+    choosePreset('max');
+  };
+
+  const doRestore = async () => {
+    const ok = await restore();
+    setNote(ok ? 'purchases restored' : 'no purchases found');
+  };
+
   return (
     <Screen scroll>
       <HeaderRow title="settings" titleAlign="left" />
 
       <Text style={[type.body, { color: colors.muted, marginTop: space.md }]}>compression preset</Text>
       <View style={s.stack}>
-        <Pressable style={[s.presetRow, s.presetSelected]}>
+        <Pressable style={[s.presetRow, preset === 'balanced' && s.presetSelected]} onPress={() => choosePreset('balanced')}>
           <View style={{ flex: 1 }}>
             <Text style={[type.body, { color: colors.text }]}>balanced</Text>
             <Text style={type.meta}>1080p · keeps quality</Text>
           </View>
-            <View style={s.radioCenter}>
-              <View style={s.radioSelected}>
-                <View style={s.radioInnerDot} />
-              </View>
-            </View>
+          <View style={preset === 'balanced' ? s.radioSelected : s.radio}>
+            {preset === 'balanced' && <View style={s.radioInnerDot} />}
+          </View>
         </Pressable>
-        <Pressable style={s.presetRow}>
+        <Pressable style={[s.presetRow, preset === 'max' && s.presetSelected]} onPress={pickMax}>
           <View style={{ flex: 1 }}>
             <Text style={[type.body, { color: colors.text }]}>max savings</Text>
-            <Text style={type.meta}>720p · smallest files</Text>
+            <Text style={type.meta}>{pro ? '720p · smallest files' : '720p · smallest files · pro'}</Text>
           </View>
-          <View style={s.radio} />
+          <View style={preset === 'max' ? s.radioSelected : s.radio}>
+            {preset === 'max' && <View style={s.radioInnerDot} />}
+          </View>
         </Pressable>
       </View>
 
       <Text style={[type.body, { color: colors.muted, marginTop: space.lg }]}>subscription</Text>
       <Card style={{ marginTop: space.sm, gap: space.md }}>
         <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>swipe media pro</Text>
-        <Text style={type.meta}>free plan · 1 cleanup a day</Text>
+        <Text style={type.meta}>{pro ? 'pro · unlimited cleanups' : 'free plan · 1 cleanup a day'}</Text>
         <View style={s.splitRow}>
-          <Pressable style={s.splitCell} onPress={() => {}}>
+          <Pressable style={s.splitCell} onPress={doRestore}>
             <Text style={[type.body, { color: colors.primary, textAlign: 'center' }]}>restore purchases</Text>
           </Pressable>
           <View style={s.splitDivider} />
@@ -46,6 +64,7 @@ export default function Settings() {
             <Text style={[type.body, { color: colors.primary, textAlign: 'center' }]}>manage plan</Text>
           </Pressable>
         </View>
+        {note && <Text style={[type.meta, { textAlign: 'center' }]}>{note}</Text>}
       </Card>
 
       <Text style={[type.body, { color: colors.muted, marginTop: space.lg }]}>privacy</Text>

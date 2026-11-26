@@ -2,7 +2,7 @@
 
 A swipe-based photo & video cleanup app for Android. Swipe through your library, remove what you don't need, compress the heavy stuff, and watch the storage come back — all on-device, with no account and no upload.
 
-> **Status:** P0 shell shipped — Expo (SDK 58) app in `mobile/` runs on the Android emulator as a development build: all 15 spec screens rendered with the sample-data ledger, full flow navigation, gates (`tsc` · eslint · jest) green. Real media, gestures, trash/compression engines and billing follow per `PLAN.md` (P1–P6).
+> **Status:** P0–P5 implemented and running on the Android emulator as an Expo development build. Real MediaStore data (permission → scopes → gallery → deck), staged sessions with swipe gestures, one-dialog batched trash with a 30-day restore ledger, on-device video compression (Media3 transformer + foreground service), share card to the system sheet, and pro/free entitlement gates. Gates: `tsc` · eslint · jest (41 tests) green. P6 hardening in progress; real Play Billing needs a Play-enabled device.
 
 ## Repo layout
 

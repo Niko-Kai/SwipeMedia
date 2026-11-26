@@ -1,16 +1,92 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { HeaderRow, MeterBar, Screen } from '@/components/ui';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS, useSharedValue, withSpring } from 'react-native-reanimated';
+import { HeaderRow, MeterBar, Screen, Toast } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
-import { deck } from '@/mock/ledger';
+import { useDashboardData } from '@/features/media/useDashboardData';
+import { useSession } from '@/features/session/session-context';
 
-/** 03 swipe — the core loop (user_flow.md v4 §2).
- *  Design order: deck card first, progress below, legend pills, then actions.
- *  Gestures wire in P2; the legend shows only ← ↑ → (no down gesture in the spec). */
+/** 03 swipe — the core loop with real gestures (P2).
+ *  up = stage-remove · left = previous · right = keep/advance (spec; no down).
+ *  Everything is staged in the session context; apply happens in 04 (P3).
+ *  setSystemGestureExclusionRects is not in RN core (spike): threshold-based
+ *  gesture activation + the 24px card inset keep edge-back out of the fight. */
 export default function Swipe() {
   const router = useRouter();
+  const { todayAssets: queue, loading } = useDashboardData();
+  const { state, start, dispatch, tally } = useSession();
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 2400);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
+
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const stampOpacity = useSharedValue(0);
+
+  // mount a fresh deck for today's scope unless an in-progress deck matches it
+  useEffect(() => {
+    if (queue.length === 0) return;
+    const sameQueue =
+      state.queue.length === queue.length && state.queue[0]?.id === queue[0]?.id;
+    const finished = state.queue.length > 0 && state.index >= state.queue.length;
+    if (!sameQueue || finished) start(queue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue.length]);
+
+  const current = state.queue[state.index];
+  const stagedSaved = tally(0);
+
+  const act = useCallback(
+    (kind: 'remove' | 'keep' | 'previous') => {
+      const item = state.queue[Math.min(state.index, state.queue.length - 1)];
+      if (!item) return;
+      if (kind === 'remove') {
+        dispatch({ type: 'remove', item });
+        setToastMsg(`moved to trash · ${formatBytes(item.sizeBytes)} freed`);
+      } else if (kind === 'keep') {
+        dispatch({ type: 'keep' });
+      } else {
+        dispatch({ type: 'previous' });
+        return; // going back never finishes the deck
+      }
+      // advancing past the last card ends the session -> 04 confirm
+      if (state.index + 1 >= state.queue.length) {
+        router.replace('/confirm');
+      }
+    },
+    [state.queue, state.index, dispatch, router]
+  );
+
+  const pan = Gesture.Pan()
+    .onUpdate((e) => {
+      tx.value = e.translationX;
+      ty.value = e.translationY;
+      stampOpacity.value = Math.min(1, Math.max(0, -e.translationY / 90));
+    })
+    .onEnd((e) => {
+      const up = e.translationY < -90 && Math.abs(e.translationX) < 70;
+      const left = e.translationX < -80 && Math.abs(e.translationY) < 70;
+      const right = e.translationX > 80 && Math.abs(e.translationY) < 70;
+      tx.value = withSpring(0);
+      ty.value = withSpring(0);
+      stampOpacity.value = withSpring(0);
+      if (up) runOnJS(act)('remove');
+      else if (right) runOnJS(act)('keep');
+      else if (left) runOnJS(act)('previous');
+    });
+
+  // navigation to 04 happens in act() when the last card is passed; no
+  // mount-time redirect here (that raced the fresh-deck reset).
+
   return (
     <Screen>
       <HeaderRow
@@ -19,30 +95,49 @@ export default function Swipe() {
         }
       />
 
-      {/* media card inset 24 px from the screen edges on a stacked deck (spec).
-         The card fills the deck area — media is the hero (v4). */}
       <View style={s.deckArea}>
         <View style={s.mediaCard}>
-          {/* stamp pressed onto the media, top-center (v4) */}
-          <View style={s.stampWrap}>
-            <Text style={s.stamp}>↑ remove</Text>
-          </View>
-          <View style={s.fileRow}>
-            <Text style={[type.body, { color: colors.text }]}>{deck.filename}</Text>
-            <Text style={type.meta}>{deck.sizeMB} MB</Text>
-          </View>
+          {current ? (
+            <>
+              <View style={s.stampWrap}>
+                <Text style={s.stamp}>↑ remove</Text>
+              </View>
+              <GestureDetector gesture={pan}>
+                <View style={s.mediaWrap}>
+                  <Image source={{ uri: current.uri }} style={s.media} contentFit="cover" />
+                  {current.mediaType === 'video' && (
+                    <View style={s.durationChip}>
+                      <Text style={s.durationText}>
+                        {Math.floor((current.durationSec ?? 0) / 60)}:{String(Math.floor((current.durationSec ?? 0) % 60)).padStart(2, '0')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </GestureDetector>
+              <View style={s.fileRow}>
+                <Text style={[type.body, { color: colors.text }]} numberOfLines={1}>{current.filename}</Text>
+                <Text style={type.meta}>{formatBytes(current.sizeBytes)}</Text>
+              </View>
+            </>
+          ) : (
+            <View style={[s.media, s.mediaEmpty]}>
+              <Text style={type.meta}>
+                {loading ? 'scanning your library…' : state.queue.length === 0 ? "nothing in this scope yet." : 'deck finished.'}
+              </Text>
+            </View>
+          )}
         </View>
-        {/* next card in the stack, peeking behind the current one */}
         <View style={s.cardBehind} pointerEvents="none" />
       </View>
 
-      {/* progress below the card, white tally (design) */}
+      {toastMsg && <Toast msg={toastMsg} />}
+
       <View style={s.progressBlock}>
         <View style={s.progressRow}>
-          <Text style={type.meta}>{deck.positionLabel}</Text>
-          <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>{formatBytes(deck.savedBytes)} saved</Text>
+          <Text style={type.meta}>{state.queue.length > 0 ? `${Math.min(state.index + 1, state.queue.length)} of ${state.queue.length}` : '0 of 0'}</Text>
+          <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>{formatBytes(stagedSaved)} saved</Text>
         </View>
-        <MeterBar progress={deck.progress} />
+        <MeterBar progress={state.queue.length > 0 ? Math.min(state.index + 1, 1) / Math.max(state.queue.length, 1) : 0} />
       </View>
 
       <View style={s.legend}>
@@ -50,16 +145,13 @@ export default function Swipe() {
         <View style={s.legendPill}><Text style={s.legendPlain}>→ keep</Text></View>
         <View style={[s.legendPill, s.legendPillPrimary]}><Text style={s.legendPrimary}>↑ remove</Text></View>
       </View>
-      {/* v4: legend reads "keep", not "next" */}
 
       <View style={s.controls}>
         <View style={{ width: 44 }} />
-        {/* v4: undo centered, compress is the violet primary on the right */}
-        <Pressable style={s.iconBtn} accessibilityLabel="undo">
+        <Pressable style={s.iconBtn} accessibilityLabel="undo" onPress={() => dispatch({ type: 'undo' })}>
           <Ionicons name="arrow-undo-outline" size={20} color={colors.text} />
         </Pressable>
-        {/* P0 stub: compress opens the paywall (spec: over limit -> 05);
-            P4 wires real compression here */}
+        {/* compress stages once the engine lands (P4); over-limit opens pro (spec) */}
         <Pressable style={s.primaryBtn} accessibilityLabel="compress" onPress={() => router.push('/paywall')}>
           <Ionicons name="contract" size={22} color={colors.onPrimary} />
         </Pressable>
@@ -82,7 +174,11 @@ const s = StyleSheet.create({
     borderColor: colors.border,
     padding: space.lg,
     zIndex: 2,
+    overflow: 'hidden',
   },
+  mediaWrap: { flex: 1 },
+  media: { flex: 1, borderRadius: 16, marginTop: space.md, marginBottom: space.md },
+  mediaEmpty: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', marginTop: space.md, marginBottom: space.md },
   cardBehind: {
     position: 'absolute',
     top: 20,
@@ -93,7 +189,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.cardAlt,
     zIndex: 1,
   },
-  stampWrap: { alignSelf: 'center', marginTop: space.md },
+  stampWrap: { alignSelf: 'center' },
   stamp: {
     fontFamily: 'Inter',
     fontSize: 13,
@@ -104,7 +200,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  fileRow: { marginTop: 'auto', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  durationChip: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  durationText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter' },
+  fileRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: space.md },
   progressBlock: { marginTop: space.lg },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: space.xs },
   legend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.lg, gap: space.sm },

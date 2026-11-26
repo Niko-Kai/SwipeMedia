@@ -1,13 +1,29 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Btn, Pill, Screen } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
+import { requestLibraryPermission } from '@/features/media/library';
 
 /** 00 landing — first-run intro (user_flow.md v4 §2).
  *  v4 hero: a three-card deck caught mid-drag — two cards stacked behind,
- *  the top photo tilted −5° carrying the violet ↑ remove chip. */
+ *  the top photo tilted −5° carrying the violet ↑ remove chip.
+ *  "allow access" asks for the REAL Photos & Videos permission (P1). */
 export default function Landing() {
   const router = useRouter();
+  const [asking, setAsking] = useState(false);
+
+  const allowAccess = async () => {
+    setAsking(true);
+    try {
+      const status = await requestLibraryPermission();
+      if (status === 'granted') router.replace('/dashboard');
+      else router.push('/permission-denied');
+    } finally {
+      setAsking(false);
+    }
+  };
+
   return (
     <Screen>
       <View style={s.hero}>
@@ -32,7 +48,7 @@ export default function Landing() {
       </View>
 
       <View style={s.footer}>
-        <Btn label="allow access" onPress={() => router.push('/dashboard')} />
+        <Btn label={asking ? 'asking…' : 'allow access'} onPress={allowAccess} disabled={asking} />
         <Btn label="not now" tone="ghost" onPress={() => router.push('/permission-denied')} />
       </View>
     </Screen>

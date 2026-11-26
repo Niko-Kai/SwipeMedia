@@ -1,14 +1,33 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { Btn, Card, HeaderRow, Screen } from '@/components/ui';
 import { colors, space, type } from '@/theme/tokens';
+import { requestLibraryPermission } from '@/features/media/library';
 
 /** 00a permission denied (user_flow.md v4 §2) */
 const STEPS = ['open settings', 'apps → swipe media', 'permissions → photos & videos'];
 
 export default function PermissionDenied() {
   const router = useRouter();
+  const [asking, setAsking] = useState(false);
+
+  const openSettings = async () => {
+    await Linking.openSettings();
+  };
+
+  const tryAgain = async () => {
+    setAsking(true);
+    try {
+      const status = await requestLibraryPermission();
+      if (status === 'granted') router.replace('/dashboard');
+    } finally {
+      setAsking(false);
+    }
+  };
+
   return (
     <Screen scroll>
       <HeaderRow back={false} />
@@ -36,10 +55,9 @@ export default function PermissionDenied() {
 
       <Text style={[type.micro, s.footnote]}>you can revoke access anytime. scans stay on this phone.</Text>
 
-      {/* P0 stub: P1 deep-links via Linking.openSettings() */}
-      <Btn label="open settings" onPress={() => router.push('/dashboard')} />
+      <Btn label="open settings" onPress={openSettings} />
       <View style={{ height: space.sm }} />
-      <Btn label="try again" tone="ghost" onPress={() => router.push('/dashboard')} />
+      <Btn label={asking ? 'asking…' : 'try again'} tone="ghost" onPress={tryAgain} disabled={asking} />
     </Screen>
   );
 }

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -125,6 +125,15 @@ export function IconBtn({ name, onPress, size = 44 }: { name: keyof typeof Ionic
     </Pressable>
   );
 }
+export function Toast({ msg }: { msg: string }) {
+  return (
+    <View style={s.toastWrap} pointerEvents="none">
+      <View style={s.toast}>
+        <Text style={s.toastLabel}>{msg}</Text>
+      </View>
+    </View>
+  );
+}
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.canvas },
@@ -190,4 +199,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  toastWrap: {
+    position: 'absolute',
+    left: space.lg,
+    right: space.lg,
+    bottom: 120,
+    alignItems: 'center',
+  },
+  toast: {
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+    paddingHorizontal: space.lg,
+  },
+  toastLabel: { ...type.meta, color: colors.text },
 });

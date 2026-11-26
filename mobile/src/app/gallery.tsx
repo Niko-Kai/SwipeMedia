@@ -1,26 +1,58 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Btn, HeaderRow, Screen } from '@/components/ui';
+import { Btn, HeaderRow, Screen, Toast } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
-import { gallery as mock } from '@/mock/ledger';
+import { useDashboardData } from '@/features/media/useDashboardData';
+import { useSession } from '@/features/session/session-context';
 
-/** 02 gallery — select by tapping (user_flow.md v4 §2).
- *  Full-bleed 3-column grid (chunked rows: immune to subpixel rounding),
- *  scrollable, with a floating selection dock over the bottom. P0 uses dark tiles;
- *  real thumbnails arrive in P1. */
+/** 02 gallery — real MediaStore thumbnails, tap-select, floating dock (P1/P2).
+ *  remove/compress stage the selection into the shared session (apply in 04/P3).
+ *  scope param: 'screenshots' (from 01) or default today's set. */
 export default function Gallery() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<number>>(new Set(mock.selectedTiles));
+  const params = useLocalSearchParams<{ scope?: string }>();
+  const scope = params.scope === 'screenshots' ? 'screenshots' : 'today';
+  const { todayAssets, screenshotAssets, loading } = useDashboardData();
+  const { start, dispatch } = useSession();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
+
+  const visible = scope === 'screenshots' ? screenshotAssets : todayAssets;
+
+  const stage = (kind: 'remove' | 'compress') => {
+    const picked = visible.filter((a) => selected.has(a.id));
+    if (picked.length === 0) return;
+    // compression is a video transcode in P4; photos have no transcode preset yet
+    const target = kind === 'compress' ? picked.filter((a) => a.mediaType === 'video') : picked;
+    if (target.length === 0) {
+      setNote('compress works on videos — pick a video');
+      return;
+    }
+    setNote(null);
+    start(target); // fresh session from the batch
+    for (const item of target) {
+      // removals are the real thing; compression's delta is replaced by the real
+      // transcode result during apply (04a)
+      dispatch(
+        kind === 'compress'
+          ? { type: 'compress', item, newSizeBytes: Math.round(item.sizeBytes * 0.3) }
+          : { type: 'remove', item }
+      );
+    }
+    router.push('/confirm');
+  };
 
   const count = selected.size;
-  const perTileBytes = mock.selectedBytes / mock.selectedCount;
-  const selectedBytes = count * perTileBytes;
+  const selectedBytes = visible
+    .filter((a) => selected.has(a.id))
+    .reduce((sum, a) => sum + a.sizeBytes, 0);
 
-  const toggle = (id: number) => {
+  const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -30,17 +62,11 @@ export default function Gallery() {
   };
 
   const toggleSelectAll = () => {
-    setSelected((prev) => {
-      if (prev.size === mock.tileCount) return new Set();
-      return new Set(Array.from({ length: mock.tileCount }, (_, i) => i));
-    });
+    setSelected((prev) => (prev.size === visible.length ? new Set() : new Set(visible.map((a) => a.id))));
   };
 
-  // chunk tiles into rows of 3
-  const rows: number[][] = [];
-  for (let i = 0; i < mock.tileCount; i += 3) {
-    rows.push([0, 1, 2].map((j) => i + j).filter((n) => n < mock.tileCount));
-  }
+  const title = scope === 'screenshots' ? 'screenshots' : 'today';
+  const totalBytes = visible.reduce((sum, a) => sum + a.sizeBytes, 0);
 
   return (
     <Screen>
@@ -54,53 +80,60 @@ export default function Gallery() {
         }
       />
 
-      {/* design: big left-aligned title block below the icon row */}
       <View style={s.titleBlock}>
-        <Text style={[type.title, { fontSize: 28 }]}>today</Text>
-        <Text style={type.meta}>{mock.meta}</Text>
+        <Text style={[type.title, { fontSize: 28 }]}>{title}</Text>
+        <Text style={type.meta}>
+          {loading ? 'scanning…' : `${visible.length} items, ${formatBytes(totalBytes)}`}
+        </Text>
       </View>
 
       <ScrollView style={s.gridScroll} contentContainerStyle={s.gridContent}>
-        {rows.map((row, r) => (
-          <View key={r} style={s.gridRow}>
-            {row.map((id) => {
-              const isSel = selected.has(id);
-              return (
-                <Pressable
-                  key={id}
-                  onPress={() => toggle(id)}
-                  style={[s.tile, isSel && s.tileSelected]}
-                  accessibilityLabel={`select tile ${id + 1}`}
-                >
-                  {isSel && (
-                    <View style={s.checkBadge}>
-                      <Text style={s.checkLabel}>✓</Text>
-                    </View>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
+        <View style={s.grid}>
+          {visible.map((asset) => {
+            const isSel = selected.has(asset.id);
+            return (
+              <Pressable
+                key={asset.id}
+                onPress={() => toggle(asset.id)}
+                style={[s.tile, isSel && s.tileSelected]}
+                accessibilityLabel={`select ${asset.filename}`}>
+                <Image source={{ uri: asset.uri }} style={s.thumb} contentFit="cover" />
+                {asset.mediaType === 'video' && (
+                  <View style={s.durationChip}>
+                    <Text style={s.durationText}>{formatDuration(asset.durationSec)}</Text>
+                  </View>
+                )}
+                {isSel && (
+                  <View style={s.checkBadge}>
+                    <Text style={s.checkLabel}>✓</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+          {visible.length === 0 && !loading && (
+            <Text style={[type.meta, { padding: space.xl }]}>nothing in this scope yet.</Text>
+          )}
+        </View>
       </ScrollView>
 
-      {/* gradient scrim + floating dock over the bottom (spec: "bottom gradient
-         scrim behind a floating dock"); tiles fade into the scrim as you scroll */}
+      {/* gradient scrim + floating dock over the bottom (spec) */}
       <LinearGradient
         colors={['rgba(20,18,27,0)', 'rgba(20,18,27,0.9)', '#14121B']}
         locations={[0, 0.35, 0.65]}
         style={s.dockScrim}>
         <View style={s.dock}>
+          {note && <Toast msg={note} />}
           <View style={s.dockMeta}>
             <Text style={[type.body, { color: colors.text }]}>{count} selected</Text>
             <Text style={type.meta}>{formatBytes(selectedBytes)}</Text>
           </View>
           <View style={s.dockButtonsRow}>
             <View style={{ flex: 1 }}>
-              <Btn label={`remove ${count}`} onPress={() => router.push('/confirm')} />
+              <Btn label={`remove ${count}`} onPress={() => stage('remove')} />
             </View>
             <View style={{ flex: 1 }}>
-              <Btn label={`compress ${count}`} tone="ghost" onPress={() => router.push('/confirm')} />
+              <Btn label={`compress ${count}`} tone="ghost" onPress={() => stage('compress')} />
             </View>
           </View>
         </View>
@@ -109,22 +142,36 @@ export default function Gallery() {
   );
 }
 
+function formatDuration(sec: number | null): string {
+  const s = Math.max(0, Math.floor(sec ?? 0));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
 const s = StyleSheet.create({
   titleBlock: { marginTop: space.sm, marginBottom: space.sm },
   gridScroll: { flex: 1 },
   gridContent: { paddingBottom: 170 },
-  gridRow: { flexDirection: 'row' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
   tile: {
-    flex: 1,
+    width: '33.3333%',
     aspectRatio: 1,
-    backgroundColor: colors.card,
-    borderTopWidth: 2,
-    borderLeftWidth: 2,
     borderRightWidth: 2,
     borderBottomWidth: 2,
     borderColor: colors.canvas,
   },
-  tileSelected: { borderColor: colors.primary },
+  tileSelected: { borderWidth: 2.5, borderColor: colors.primary },
+  thumb: { flex: 1, backgroundColor: colors.cardAlt },
+  durationChip: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  durationText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'Inter' },
   checkBadge: {
     position: 'absolute',
     top: 8,

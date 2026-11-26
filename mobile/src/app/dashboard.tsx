@@ -1,118 +1,161 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Btn, Pill, Screen } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
-import { highYieldScopes, dateScopes as mockScopes, savedSoFarGB, storage } from '@/mock/ledger';
+import { useDashboardData } from '@/features/media/useDashboardData';
 
-/** 01 dashboard — storage and scope (user_flow.md v4 §2) */
+/** 01 dashboard — storage and scope on REAL MediaStore data (P1). */
+type ScopeId = 'today' | 'yesterday' | 'last7Days' | 'range';
 
-/** 01 dashboard — storage and scope (user_flow.md v4 §2) */
 export default function Dashboard() {
   const router = useRouter();
+  const { loading, stats, storage, savedSoFarBytes, trashItems } = useDashboardData();
+  const [selected, setSelected] = useState<ScopeId>('today');
+
+  if (loading) {
+    return (
+      <View style={s.loadingWrap}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[type.meta, { marginTop: space.md }]}>scanning your library…</Text>
+      </View>
+    );
+  }
+
+  const usedBytes = storage ? storage.totalBytes - storage.freeBytes : 0;
+  const usedGB = storage ? usedBytes / 1024 ** 3 : 0;
+  const freeGB = storage ? storage.freeBytes / 1024 ** 3 : 0;
+
+  const scopeCount = (id: ScopeId): number =>
+    id === 'today' ? stats.today.count : id === 'yesterday' ? stats.yesterday.count : id === 'last7Days' ? stats.last7Days.count : -1;
+
+  const dateRows: { id: ScopeId; label: string; detail: string; bytes: number | null }[] = [
+    { id: 'today', label: 'today', detail: `${stats.today.count} items`, bytes: stats.today.bytes },
+    { id: 'yesterday', label: 'yesterday', detail: `${stats.yesterday.count} items`, bytes: stats.yesterday.bytes },
+    { id: 'last7Days', label: 'last 7 days', detail: `${stats.last7Days.count} items`, bytes: stats.last7Days.bytes },
+    { id: 'range', label: 'pick a date', detail: 'any range you choose', bytes: null },
+  ];
+
   return (
     <Screen scroll>
-      {/* header: wordmark left · trash count, trash, gear, pro right (spec) */}
+      {/* header: wordmark left · trash, gear, pro right (spec).
+          trash badge renders only when the trash store has items (P3). */}
       <View style={s.header}>
         <Text style={s.wordmark}>swipe media</Text>
         <View style={s.headerRight}>
-          <Pressable onPress={() => router.push('/paywall')} hitSlop={8} accessibilityLabel="pro">
-            <Pill label="pro" tone="primary" />
-          </Pressable>
-          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
           <Pressable onPress={() => router.push('/trash')} hitSlop={8} accessibilityLabel="open trash">
             <View style={s.trashBadgeWrap}>
               <Ionicons name="trash-outline" size={22} color={colors.text} />
-              <View style={s.trashBadge}>
-                <Text style={s.trashBadgeLabel}>36</Text>
-              </View>
+              {trashItems > 0 && (
+                <View style={s.trashBadge}>
+                  <Text style={s.trashBadgeLabel}>{trashItems}</Text>
+                </View>
+              )}
             </View>
+          </Pressable>
+          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
+          <Pressable onPress={() => router.push('/paywall')} hitSlop={8} accessibilityLabel="pro">
+            <Pill label="pro" tone="primary" />
           </Pressable>
         </View>
       </View>
 
       <View style={s.figure}>
-        <Text style={[type.hero, { fontSize: 44 }]}>{savedSoFarGB} GB</Text>
+        <Text style={[type.hero, { fontSize: 44 }]}>{formatBytes(savedSoFarBytes)}</Text>
         <Text style={type.meta}>saved so far</Text>
-        <View style={{ marginTop: space.md }}>
-          {/* 58.2 of 64 GB = 91% full (ledger) */}
-          <View style={s.meter}>
-            <View style={[s.meterFill, { flex: storage.usedGB }]} />
-            <View style={{ flex: storage.freeGB }} />
+        {storage && (
+          <View style={{ marginTop: space.md }}>
+            <View style={s.meter}>
+              <View style={[s.meterFill, { flex: Math.max(usedBytes, 1) }]} />
+              <View style={{ flex: Math.max(storage.freeBytes, 1) }} />
+            </View>
+            <View style={[s.meterLabels, { marginTop: space.xs }]}>
+              <Text style={type.meta}>{usedGB.toFixed(1)} GB used</Text>
+              <Text style={type.meta}>{freeGB.toFixed(1)} GB free</Text>
+            </View>
           </View>
-          <View style={[s.meterLabels, { marginTop: space.xs }]}>
-            <Text style={type.meta}>{storage.usedGB} GB used</Text>
-            <Text style={type.meta}>{storage.freeGB} GB free</Text>
-          </View>
-        </View>
+        )}
       </View>
 
       <Text style={[type.title, { fontSize: 20 }]}>clean what first?</Text>
       <View style={s.cardsRow}>
-        {highYieldScopes.map((scope) => (
-          <Pressable
-            key={scope.id}
-            style={[s.cardBase, { flex: 1 }]}
-            onPress={() => router.push(scope.id === 'screenshots' ? '/gallery' : '/swipe')}
-          >
-            {scope.id === 'videos' ? (
-              /* v4: real video thumbnail 36×27 (mock block until P1 real media) */
-              <View style={s.videoThumb}>
-                <Ionicons name="play" size={10} color={colors.onPrimary} />
-              </View>
-            ) : (
-              /* v4: 2×2 mini-grid of screenshots, 16×12 each (mock until P1) */
-              <View style={s.miniGrid}>
-                {[0, 1, 2, 3].map((n) => (
-                  <View key={n} style={s.miniGridCell} />
-                ))}
-              </View>
-            )}
-            <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>{scope.label}</Text>
-            <Text style={type.meta}>{scope.detail} · {formatBytes(scope.bytes)}</Text>
-          </Pressable>
-        ))}
+        <Pressable
+          style={[s.cardBase, { flex: 1 }]}
+          onPress={() =>
+            stats.largeVideos.count === 0 ? router.push({ pathname: '/empty-deck', params: { scope: 'largeVideos' } }) : router.push('/swipe')
+          }>
+          <View style={s.videoThumb}>
+            <Ionicons name="play" size={10} color={colors.onPrimary} />
+          </View>
+          <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>large videos</Text>
+          <Text style={type.meta}>{stats.largeVideos.count} · {formatBytes(stats.largeVideos.bytes)}</Text>
+        </Pressable>
+        <Pressable
+          style={[s.cardBase, { flex: 1 }]}
+          onPress={() =>
+            stats.screenshots.count === 0 ? router.push({ pathname: '/empty-deck', params: { scope: 'screenshots' } }) : router.push('/gallery')
+          }>
+          <View style={s.miniGridRow}>
+            <View style={s.miniGridCell} />
+            <View style={s.miniGridCell} />
+            <View style={s.miniGridCell} />
+            <View style={s.miniGridCell} />
+          </View>
+          <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>screenshots</Text>
+          <Text style={type.meta}>{stats.screenshots.count} · {formatBytes(stats.screenshots.bytes)}</Text>
+        </Pressable>
       </View>
 
       <Text style={[type.body, { color: colors.muted, marginTop: space.md }]}>or by date</Text>
       <View style={s.list}>
-        {mockScopes.map((scope) => {
-          const selected = scope.selected === true;
+        {dateRows.map((row) => {
+          const isSel = selected === row.id;
           return (
             <Pressable
-              key={scope.id}
-              style={[s.cardBase, s.scopeRow, selected && s.scopeSelected]}
+              key={row.id}
+              style={[s.cardBase, s.scopeRow, isSel && s.scopeSelected]}
               onPress={() => {
-                if (scope.id === 'range') router.push('/pick-range');
-                else router.push('/swipe');
-              }}
-            >
+                if (row.id === 'range') {
+                  router.push('/pick-range');
+                  setSelected('range');
+                } else {
+                  setSelected(row.id);
+                }
+              }}>
               <View style={{ flex: 1 }}>
-                <Text style={[type.body, { color: selected ? colors.text : colors.muted }]}>{scope.label}</Text>
-                <Text style={type.meta}>{scope.detail}</Text>
+                <Text style={[type.body, { color: isSel ? colors.text : colors.muted }]}>{row.label}</Text>
+                <Text style={type.meta}>{row.detail}</Text>
               </View>
-              {scope.bytes !== undefined ? (
-                <Text style={[type.body, { fontWeight: '700', color: selected ? colors.primary : colors.text }]}>
-                  {formatBytes(scope.bytes)}
+              {row.bytes !== null ? (
+                <Text style={[type.body, { fontWeight: '700', color: isSel ? colors.primary : colors.text }]}>
+                  {formatBytes(row.bytes)}
                 </Text>
               ) : (
                 <Text style={type.meta}>choose</Text>
               )}
-              <View style={selected ? s.radioSelected : s.radio} />
+              <View style={isSel && row.id !== 'range' ? s.radioSelected : s.radio} />
             </Pressable>
           );
         })}
       </View>
 
-      <View style={[s.footer, {}]}>
-        <Btn label="start cleaning" onPress={() => router.push('/swipe')} />
+      <View style={s.footer}>
+        <Btn
+          label="start cleaning"
+          onPress={() => {
+            if (selected === 'range' || scopeCount(selected) > 0) router.push('/swipe');
+            else router.push({ pathname: '/empty-deck', params: { scope: selected } });
+          }}
+        />
       </View>
     </Screen>
   );
 }
 
 const s = StyleSheet.create({
+  loadingWrap: { flex: 1, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
   header: {
     height: 56,
     flexDirection: 'row',
@@ -156,13 +199,11 @@ const s = StyleSheet.create({
     height: 27,
     width: 36,
     borderRadius: 8,
-    backgroundColor: colors.cardAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
+  miniGridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
   miniGridCell: {
     height: 12,
     width: 16,

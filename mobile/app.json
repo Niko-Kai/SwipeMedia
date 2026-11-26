@@ -27,6 +27,17 @@
     "plugins": [
       "expo-router",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow swipe media to access your photos",
+          "granularPermissions": [
+            "photo",
+            "video"
+          ]
+        }
+      ],
+      "./modules/mediatools/plugin",
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#14121B",
@@ -63,7 +74,9 @@
             ]
           }
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

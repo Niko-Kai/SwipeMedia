@@ -1,0 +1,19 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.nikokai.swipemedia'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.mediatools"
+}
+
+dependencies {
+  // P4: on-device video transcoding (the supported Android path; ffmpeg-kit is retired)
+  implementation "androidx.media3:media3-transformer:1.11.1"
+  implementation "androidx.media3:media3-effect:1.11.1"
+  implementation "androidx.media3:media3-common:1.11.1"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+}

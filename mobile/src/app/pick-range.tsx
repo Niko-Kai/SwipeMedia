@@ -1,19 +1,66 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Btn } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
-import { calendar } from '@/mock/ledger';
+import { monthGrid, isSameLocalDay, startOfDayLocal } from '@/lib/dates';
 
-/** 01a pick a range — month calendar sheet (user_flow.md v4 §2).
- *  June 2026 starts Monday; range 15–18: endpoints solid violet, interior tinted,
- *  today 23 outlined, trailing July days dimmed. P1 swaps the mock for real month math. */
-const [startDay, endDay] = calendar.selectedRange;
+const MONTHS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
 
+/** 01a pick a range — real month calendar sheet (user_flow.md v4 §2).
+ *  Monday-first grid, tap-to-select start then end, dimmed surrounding days. */
 export default function PickRange() {
   const router = useRouter();
-  // 30 days + 5 trailing dimmed July cells = 6×7 grid (spec)
-  const cells = [...Array.from({ length: calendar.daysInMonth }, (_, i) => i + 1), 1, 2, 3, 4, 5];
+  const [cursor, setCursor] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+  const [todayMs] = useState(() => startOfDayLocal(Date.now()));
+  const [rangeStart, setRangeStart] = useState<number | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<number | null>(null);
+
+  const grid = monthGrid(cursor.year, cursor.month);
+
+  const tapDay = (day: number) => {
+    const ms = startOfDayLocal(new Date(cursor.year, cursor.month, day).getTime());
+    if (rangeStart === null || (rangeStart !== null && rangeEnd !== null)) {
+      setRangeStart(ms);
+      setRangeEnd(null);
+    } else if (ms < rangeStart) {
+      setRangeStart(ms);
+    } else {
+      setRangeEnd(ms);
+    }
+  };
+
+  const dayMs = (day: number) => startOfDayLocal(new Date(cursor.year, cursor.month, day).getTime());
+  const inRange = (day: number) =>
+    rangeStart !== null && rangeEnd !== null && dayMs(day) > rangeStart && dayMs(day) < rangeEnd;
+  const isEndpoint = (day: number) => (rangeStart !== null && dayMs(day) === rangeStart) || (rangeEnd !== null && dayMs(day) === rangeEnd);
+  const isToday = (day: number) => isSameLocalDay(dayMs(day), todayMs);
+
+  const dayStyle = (day: number) =>
+    isEndpoint(day) ? s.dayEndpoint : inRange(day) ? s.dayInRange : isToday(day) ? s.dayToday : s.dayPlain;
+  const labelStyle = (day: number) =>
+    isEndpoint(day) ? s.dayEndpointLabel : inRange(day) ? s.dayInRangeLabel : isToday(day) ? s.dayTodayLabel : s.dayPlainLabel;
+
+  const shiftMonth = (delta: number) => {
+    setCursor((c) => {
+      const d = new Date(c.year, c.month + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() };
+    });
+  };
+
+  const hint =
+    rangeStart !== null && rangeEnd !== null
+      ? `${monthDayLabel(rangeStart)} – ${monthDayLabel(rangeEnd)} · ${Math.round((rangeEnd - rangeStart) / 864e5) + 1} days`
+      : rangeStart !== null
+        ? `${monthDayLabel(rangeStart)} — pick an end day`
+        : 'tap a start and end day';
 
   return (
     <View style={s.backdrop}>
@@ -29,50 +76,58 @@ export default function PickRange() {
             <Text style={[type.body, { color: colors.muted }]}>cancel</Text>
           </Pressable>
         </View>
-        <Text style={[type.meta, { marginTop: space.xs }]}>{calendar.hint}</Text>
+        <Text style={[type.meta, { marginTop: space.xs }]}>{hint}</Text>
 
         <View style={s.monthNav}>
-          <Ionicons name="chevron-back" size={18} color={colors.muted} />
-          <Text style={[type.body, { color: colors.text }]}>{calendar.monthLabel.trim().replace('‹', '').replace('›', '').trim()}</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          <Pressable onPress={() => shiftMonth(-1)} hitSlop={12} accessibilityLabel="previous month">
+            <Ionicons name="chevron-back" size={18} color={colors.muted} />
+          </Pressable>
+          <Text style={[type.body, { color: colors.text }]}>
+            {MONTHS[cursor.month]} {cursor.year}
+          </Text>
+          <Pressable onPress={() => shiftMonth(1)} hitSlop={12} accessibilityLabel="next month">
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </Pressable>
         </View>
 
         <View style={s.weekRow}>
-          {calendar.weekdays.map((d, i) => (
+          {grid.weekdays.map((d, i) => (
             <Text key={i} style={s.weekday}>{d}</Text>
           ))}
         </View>
 
         <View style={s.grid}>
-          {cells.map((day, i) => (
-            <View key={i} style={[s.cell, cellStyle(day)]}>
-              <Text style={cellLabel(day)}>{day}</Text>
+          {/* leading blanks keep columns aligned */}
+          {Array.from({ length: grid.leadingBlanks }, (_, i) => (
+            <View key={`b${i}`} style={s.cell} />
+          ))}
+          {Array.from({ length: grid.daysInMonth }, (_, i) => i + 1).map((day) => (
+            <Pressable key={day} style={[s.cell, dayStyle(day)]} onPress={() => tapDay(day)} accessibilityLabel={`day ${day}`}>
+              <Text style={labelStyle(day)}>{day}</Text>
+            </Pressable>
+          ))}
+          {grid.trailing.map((d) => (
+            <View key={`t${d}`} style={[s.cell, s.dayDim]}>
+              <Text style={s.dayDimLabel}>{d}</Text>
             </View>
           ))}
         </View>
 
-        <View style={[s.footer, {}]}>
-          <Btn label="apply range" onPress={() => router.replace('/swipe')} />
+        <View style={s.footer}>
+          <Btn
+            label="apply range"
+            disabled={rangeStart === null || rangeEnd === null}
+            onPress={() => router.replace('/swipe')}
+          />
         </View>
       </View>
     </View>
   );
 }
 
-function cellStyle(day: number) {
-  if (day > calendar.daysInMonth) return s.dayDim;
-  if (day === calendar.today) return s.dayToday;
-  if (day === startDay || day === endDay) return s.dayEndpoint;
-  if (day > startDay && day < endDay) return s.dayInRange;
-  return s.dayPlain;
-}
-
-function cellLabel(day: number) {
-  if (day > calendar.daysInMonth) return s.dayDimLabel;
-  if (day === startDay || day === endDay) return s.dayEndpointLabel;
-  if (day > startDay && day < endDay) return s.dayInRangeLabel;
-  if (day === calendar.today) return s.dayTodayLabel;
-  return s.dayPlainLabel;
+function monthDayLabel(ms: number): string {
+  const d = new Date(ms);
+  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 }
 
 const s = StyleSheet.create({

@@ -1,16 +1,43 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Btn } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { paywall } from '@/mock/ledger';
+import { useEntitlement } from '@/features/billing/entitlement-context';
 
 /** 05 paywall — sheet over a dimmed caller (user_flow.md v4 §2).
- *  Drawn as what it is: the caller stays behind a scrim, offers in a rounded
- *  bottom sheet (same grammar as the 01a calendar sheet). 30-day trash + restore
- *  is free for everyone; pro sells volume + compression. */
+ *  On a Play-enabled device "continue" launches Google Play Billing; the
+ *  entitlement contract is identical, so the emulator exercises it directly.
+ *  30-day trash + restore is free for everyone; pro sells volume + compression. */
 export default function Paywall() {
   const router = useRouter();
+  const { purchase, restore, pro } = useEntitlement();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [selected, setSelected] = useState('annual');
+
+  const buy = async () => {
+    setBusy(true);
+    try {
+      await purchase();
+      router.back(); // spec: close/purchase returns to the caller
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRestore = async () => {
+    setBusy(true);
+    try {
+      const ok = await restore();
+      setNote(ok ? 'purchases restored' : 'no purchases found on this account');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <View style={s.backdrop}>
       <Pressable style={s.backdropTouch} onPress={() => router.back()} />
@@ -18,7 +45,6 @@ export default function Paywall() {
         <View style={s.grabberWrap}>
           <View style={s.grabber} />
         </View>
-        <ScrollView contentContainerStyle={s.sheetScroll}>
 
         {/* v4: close X on its own row, top-right of the sheet */}
         <View style={s.closeRow}>
@@ -27,51 +53,60 @@ export default function Paywall() {
           </Pressable>
         </View>
 
-        <View style={s.headerRow}>
-          <View style={s.proBadge}>
-            <Text style={s.proLabel}>pro</Text>
+        <ScrollView contentContainerStyle={s.sheetScroll}>
+          <View style={s.headerRow}>
+            <View style={s.proBadge}>
+              <Text style={s.proLabel}>pro</Text>
+            </View>
+            <Text style={[type.body, { fontWeight: '600', color: colors.text, flex: 1 }]}>clean without limits</Text>
           </View>
-          <Text style={[type.body, { fontWeight: '600', color: colors.text, flex: 1 }]}>clean without limits</Text>
-        </View>
-        <Text style={[type.meta, { marginTop: space.xs }]}>unlimited cleanups and max-savings compression.</Text>
+          <Text style={[type.meta, { marginTop: space.xs }]}>
+            {pro ? 'pro is active on this device.' : 'unlimited cleanups and max-savings compression.'}
+          </Text>
 
-        <View style={{ marginTop: space.lg, gap: space.sm }}>
-          {paywall.benefits.map((benefit) => (
-            <View key={benefit} style={s.benefitRow}>
-              <Ionicons name="checkmark" size={16} color={colors.primary} />
-              <Text style={[type.body, { color: colors.text }]}>{benefit}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={{ marginTop: space.lg, gap: space.sm }}>
-          {paywall.plans.map((plan) => (
-            <View key={plan.id} style={plan.selected ? s.planSelected : s.plan}>
-              <View style={{ flex: 1 }}>
-                <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>
-                  {plan.label}
-                </Text>
-                <Text style={type.meta}>{plan.price}</Text>
-                {plan.sub ? <Text style={type.meta}>{plan.sub}</Text> : null}
+          <View style={{ marginTop: space.lg, gap: space.sm }}>
+            {paywall.benefits.map((benefit) => (
+              <View key={benefit} style={s.benefitRow}>
+                <Ionicons name="checkmark" size={16} color={colors.primary} />
+                <Text style={[type.body, { color: colors.text }]}>{benefit}</Text>
               </View>
-              {plan.id === 'annual' && (
-                <View style={s.saveChip}>
-                  <Text style={s.saveChipLabel}>save 85%</Text>
-                </View>
-              )}
-              <View style={plan.selected ? s.radioOuterSelected : s.radioOuter}>
-                {plan.selected && <View style={s.radioInnerDot} />}
-              </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
 
-        <Btn label="continue" onPress={() => router.back()} />
-        <Text style={[type.meta, { textAlign: 'center', marginTop: space.md }]}>google play billing · cancel anytime</Text>
-        <Text style={[type.body, { color: colors.text, textAlign: 'center', marginTop: space.xs }]} onPress={() => {}}>
-          restore purchases
-        </Text>
-        <Text style={[type.micro, { textAlign: 'center', marginTop: space.xs, marginBottom: space.lg }]}>terms · privacy · refunds</Text>
+          <View style={{ marginTop: space.lg, gap: space.sm }}>
+            {paywall.plans.map((plan) => {
+              const isSel = selected === plan.id;
+              return (
+                <Pressable key={plan.id} onPress={() => setSelected(plan.id)} style={isSel ? s.planSelected : s.plan}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>{plan.label}</Text>
+                    <Text style={type.meta}>{plan.price}</Text>
+                    {plan.sub ? <Text style={type.meta}>{plan.sub}</Text> : null}
+                  </View>
+                  {plan.id === 'annual' && (
+                    <View style={s.saveChip}>
+                      <Text style={s.saveChipLabel}>save 85%</Text>
+                    </View>
+                  )}
+                  <View style={isSel ? s.radioOuterSelected : s.radioOuter}>
+                    {isSel && <View style={s.radioInnerDot} />}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={{ marginTop: space.lg }}>
+            <Btn label={busy ? 'working…' : pro ? 'pro active' : 'continue'} onPress={buy} disabled={busy || pro} />
+          </View>
+          <Text style={[type.meta, { textAlign: 'center', marginTop: space.md }]}>google play billing · cancel anytime</Text>
+          <Pressable onPress={doRestore} hitSlop={8}>
+            <Text style={[type.body, { color: colors.text, textAlign: 'center', marginTop: space.xs }]}>
+              restore purchases
+            </Text>
+          </Pressable>
+          {note && <Text style={[type.meta, { textAlign: 'center', marginTop: space.xs }]}>{note}</Text>}
+          <Text style={[type.micro, { textAlign: 'center', marginTop: space.xs, marginBottom: space.lg }]}>terms · privacy · refunds</Text>
         </ScrollView>
       </View>
     </View>
@@ -91,8 +126,8 @@ const s = StyleSheet.create({
   },
   grabberWrap: { alignItems: 'center', paddingVertical: space.xs },
   grabber: { width: 44, height: 5, borderRadius: 999, backgroundColor: colors.border },
-  sheetScroll: { paddingBottom: space.xl },
   closeRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: space.xs },
+  sheetScroll: { paddingBottom: space.xl },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3,16 +3,21 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Btn, HeaderRow, Screen } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
+import { formatBytes } from '@/lib/bytes';
+import { useDashboardData } from '@/features/media/useDashboardData';
 
-/** 00b empty deck (user_flow.md v4 §2) */
-const SHORTCUTS = [
-  { label: 'last 7 days', detail: '312 items · 7.8 GB', href: '/swipe' as const, icon: 'calendar-outline' },
-  { label: 'large videos', detail: '38 videos · 12.4 GB', href: '/swipe' as const, thumb: 'video' as const, duration: '0:12' },
-  { label: 'screenshots', detail: '1,204 shots · 3.1 GB', href: '/gallery' as const, thumb: 'grid' as const },
-];
-
+/** 00b empty deck — real scope counts from MediaStore (P1).
+ *  Reached when the chosen scope has 0 items (user_flow.md v4 §2). */
 export default function EmptyDeck() {
   const router = useRouter();
+  const { stats } = useDashboardData();
+
+  const shortcuts = [
+    { label: 'last 7 days', detail: `${stats.last7Days.count} items · ${formatBytes(stats.last7Days.bytes)}`, href: '/swipe' as const, icon: 'calendar-outline' as const },
+    { label: 'large videos', detail: `${stats.largeVideos.count} videos · ${formatBytes(stats.largeVideos.bytes)}`, href: '/swipe' as const, thumb: 'video' as const, duration: '0:12' },
+    { label: 'screenshots', detail: `${stats.screenshots.count} shots · ${formatBytes(stats.screenshots.bytes)}`, href: '/gallery' as const, thumb: 'shot' as const },
+  ];
+
   return (
     <Screen scroll>
       <HeaderRow />
@@ -25,7 +30,7 @@ export default function EmptyDeck() {
       </View>
 
       <View style={s.list}>
-        {SHORTCUTS.map((row) => (
+        {shortcuts.map((row) => (
           <Pressable key={row.label} style={s.row} onPress={() => router.push(row.href)}>
             {row.icon ? (
               <View style={s.rowIcon}>
@@ -35,12 +40,11 @@ export default function EmptyDeck() {
               <View style={s.rowThumbVideo}>
                 <Text style={s.durationChip}>{row.duration}</Text>
               </View>
-            ) : (
-              /* v4: real screenshot thumbnail block, violet outline (mock until P1) */
+            ) : row.thumb === 'shot' ? (
               <View style={s.rowThumbShot}>
                 <Ionicons name="image-outline" size={14} color={colors.muted} />
               </View>
-            )}
+            ) : null}
             <View style={{ flex: 1 }}>
               <Text style={[type.body, { color: colors.text }]}>{row.label}</Text>
               <Text style={type.meta}>{row.detail}</Text>
