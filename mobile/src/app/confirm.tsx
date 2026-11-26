@@ -85,15 +85,13 @@ export default function Confirm() {
       </Text>
 
       <View style={s.footer}>
-        {empty ? (
-          <Btn label="discard" tone="ghost" onPress={() => router.dismissTo('/dashboard')} />
-        ) : (
-          <>
-            <Btn label="apply cleanup" onPress={() => router.push('/applying')} />
-            <View style={{ height: space.sm }} />
-            <Btn label="discard" tone="ghost" onPress={() => router.dismissTo('/dashboard')} />
-          </>
-        )}
+        <Btn
+          label="apply cleanup"
+          onPress={() => router.push('/applying')}
+          disabled={empty}
+        />
+        <View style={{ height: space.sm }} />
+        <Btn label="discard" tone="ghost" onPress={() => router.dismissTo('/dashboard')} />
       </View>
     </Screen>
   );

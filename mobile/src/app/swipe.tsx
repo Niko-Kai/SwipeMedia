@@ -96,6 +96,8 @@ export default function Swipe() {
       />
 
       <View style={s.deckArea}>
+        {/* next card peeking behind the active one (v4 stacked deck) */}
+        <View style={s.cardBehind} pointerEvents="none" />
         <View style={s.mediaCard}>
           {current ? (
             <>
@@ -115,19 +117,18 @@ export default function Swipe() {
                 </View>
               </GestureDetector>
               <View style={s.fileRow}>
-                <Text style={[type.body, { color: colors.text }]} numberOfLines={1}>{current.filename}</Text>
+                <Text style={[type.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>{current.filename}</Text>
                 <Text style={type.meta}>{formatBytes(current.sizeBytes)}</Text>
               </View>
             </>
           ) : (
             <View style={[s.media, s.mediaEmpty]}>
               <Text style={type.meta}>
-                {loading ? 'scanning your library…' : state.queue.length === 0 ? "nothing in this scope yet." : 'deck finished.'}
+                {loading ? 'scanning your library…' : 'nothing in this scope yet.'}
               </Text>
             </View>
           )}
         </View>
-        <View style={s.cardBehind} pointerEvents="none" />
       </View>
 
       {toastMsg && <Toast msg={toastMsg} />}
@@ -165,6 +166,7 @@ const s = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     position: 'relative',
+    paddingBottom: 12,
   },
   mediaCard: {
     flex: 1,
@@ -172,19 +174,19 @@ const s = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: space.lg,
+    padding: space.md,
     zIndex: 2,
     overflow: 'hidden',
   },
   mediaWrap: { flex: 1 },
-  media: { flex: 1, borderRadius: 16, marginTop: space.md, marginBottom: space.md },
+  media: { flex: 1, borderRadius: 14 },
   mediaEmpty: { backgroundColor: colors.cardAlt, alignItems: 'center', justifyContent: 'center', marginTop: space.md, marginBottom: space.md },
   cardBehind: {
     position: 'absolute',
-    top: 20,
-    left: 12,
-    right: 12,
-    bottom: -14,
+    top: 18,
+    left: 14,
+    right: 14,
+    bottom: 0,
     borderRadius: radius.card,
     backgroundColor: colors.cardAlt,
     zIndex: 1,
@@ -221,9 +223,9 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
   },
-  legendPillPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  legendPillPrimary: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
   legendPlain: { ...type.meta, color: colors.text },
-  legendPrimary: { ...type.meta, color: colors.onPrimary, fontWeight: '700' },
+  legendPrimary: { ...type.meta, color: colors.primary, fontWeight: '700' },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',

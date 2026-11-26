@@ -88,33 +88,36 @@ export default function Gallery() {
       </View>
 
       <ScrollView style={s.gridScroll} contentContainerStyle={s.gridContent}>
-        <View style={s.grid}>
-          {visible.map((asset) => {
-            const isSel = selected.has(asset.id);
-            return (
-              <Pressable
-                key={asset.id}
-                onPress={() => toggle(asset.id)}
-                style={[s.tile, isSel && s.tileSelected]}
-                accessibilityLabel={`select ${asset.filename}`}>
-                <Image source={{ uri: asset.uri }} style={s.thumb} contentFit="cover" />
-                {asset.mediaType === 'video' && (
-                  <View style={s.durationChip}>
-                    <Text style={s.durationText}>{formatDuration(asset.durationSec)}</Text>
-                  </View>
-                )}
-                {isSel && (
-                  <View style={s.checkBadge}>
-                    <Text style={s.checkLabel}>✓</Text>
-                  </View>
-                )}
-              </Pressable>
-            );
-          })}
-          {visible.length === 0 && !loading && (
-            <Text style={[type.meta, { padding: space.xl }]}>nothing in this scope yet.</Text>
-          )}
-        </View>
+        {chunk(visible, 3).map((row, r) => (
+          <View key={r} style={s.gridRow}>
+            {row.map((asset) => {
+              const isSel = selected.has(asset.id);
+              return (
+                <Pressable
+                  key={asset.id}
+                  onPress={() => toggle(asset.id)}
+                  style={[s.tile, isSel && s.tileSelected]}
+                  accessibilityLabel={`select ${asset.filename}`}>
+                  <Image source={{ uri: asset.uri }} style={s.thumb} contentFit="cover" />
+                  {asset.mediaType === 'video' && (
+                    <View style={s.durationChip}>
+                      <Text style={s.durationText}>{formatDuration(asset.durationSec)}</Text>
+                    </View>
+                  )}
+                  {isSel && (
+                    <View style={s.checkBadge}>
+                      <Text style={s.checkLabel}>✓</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+            {row.length < 3 && <View style={{ flex: 3 - row.length }} />}
+          </View>
+        ))}
+        {visible.length === 0 && !loading && (
+          <Text style={[type.meta, { padding: space.xl }]}>nothing in this scope yet.</Text>
+        )}
       </ScrollView>
 
       {/* gradient scrim + floating dock over the bottom (spec) */}
@@ -148,13 +151,19 @@ function formatDuration(sec: number | null): string {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
 const s = StyleSheet.create({
   titleBlock: { marginTop: space.sm, marginBottom: space.sm },
   gridScroll: { flex: 1 },
   gridContent: { paddingBottom: 170 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  gridRow: { flexDirection: 'row' },
   tile: {
-    width: '33.3333%',
+    flex: 1,
     aspectRatio: 1,
     borderRightWidth: 2,
     borderBottomWidth: 2,

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Btn, Pill, Screen } from '@/components/ui';
 import { colors, radius, space, type } from '@/theme/tokens';
 import { formatBytes } from '@/lib/bytes';
+import { isScreenshot } from '@/features/scopes/scopes';
 import { useDashboardData } from '@/features/media/useDashboardData';
 
 /** 01 dashboard — storage and scope on REAL MediaStore data (P1). */
@@ -12,7 +14,7 @@ type ScopeId = 'today' | 'yesterday' | 'last7Days' | 'range';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { loading, stats, storage, savedSoFarBytes, trashItems } = useDashboardData();
+  const { loading, stats, storage, savedSoFarBytes, trashItems, assets } = useDashboardData();
   const [selected, setSelected] = useState<ScopeId>('today');
 
   if (loading) {
@@ -27,6 +29,10 @@ export default function Dashboard() {
   const usedBytes = storage ? storage.totalBytes - storage.freeBytes : 0;
   const usedGB = storage ? usedBytes / 1024 ** 3 : 0;
   const freeGB = storage ? storage.freeBytes / 1024 ** 3 : 0;
+
+  // real thumbnails for the high-yield cards (v4: media, not drawn glyphs)
+  const topVideo = assets.find((a) => a.mediaType === 'video');
+  const screenshotThumbs = assets.filter((a) => isScreenshot(a)).slice(0, 4);
 
   const scopeCount = (id: ScopeId): number =>
     id === 'today' ? stats.today.count : id === 'yesterday' ? stats.yesterday.count : id === 'last7Days' ? stats.last7Days.count : -1;
@@ -45,6 +51,10 @@ export default function Dashboard() {
       <View style={s.header}>
         <Text style={s.wordmark}>swipe media</Text>
         <View style={s.headerRight}>
+          <Pressable onPress={() => router.push('/paywall')} hitSlop={8} accessibilityLabel="pro">
+            <Pill label="pro" tone="primary" />
+          </Pressable>
+          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
           <Pressable onPress={() => router.push('/trash')} hitSlop={8} accessibilityLabel="open trash">
             <View style={s.trashBadgeWrap}>
               <Ionicons name="trash-outline" size={22} color={colors.text} />
@@ -54,10 +64,6 @@ export default function Dashboard() {
                 </View>
               )}
             </View>
-          </Pressable>
-          <Ionicons name="settings-outline" size={22} color={colors.text} accessibilityLabel="open settings" onPress={() => router.push('/settings')} />
-          <Pressable onPress={() => router.push('/paywall')} hitSlop={8} accessibilityLabel="pro">
-            <Pill label="pro" tone="primary" />
           </Pressable>
         </View>
       </View>
@@ -86,23 +92,35 @@ export default function Dashboard() {
           onPress={() =>
             stats.largeVideos.count === 0 ? router.push({ pathname: '/empty-deck', params: { scope: 'largeVideos' } }) : router.push('/swipe')
           }>
-          <View style={s.videoThumb}>
-            <Ionicons name="play" size={10} color={colors.onPrimary} />
-          </View>
+          {topVideo ? (
+            <View style={s.videoThumb}>
+              <Image source={{ uri: topVideo.uri }} style={s.videoThumbImage} contentFit="cover" />
+              <View style={s.videoThumbBadge}>
+                <Ionicons name="play" size={9} color={colors.onPrimary} />
+              </View>
+            </View>
+          ) : (
+            <View style={s.videoThumb}><Ionicons name="play" size={10} color={colors.muted} /></View>
+          )}
           <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>large videos</Text>
           <Text style={type.meta}>{stats.largeVideos.count} · {formatBytes(stats.largeVideos.bytes)}</Text>
         </Pressable>
         <Pressable
           style={[s.cardBase, { flex: 1 }]}
           onPress={() =>
-            stats.screenshots.count === 0 ? router.push({ pathname: '/empty-deck', params: { scope: 'screenshots' } }) : router.push('/gallery')
+            stats.screenshots.count === 0 ? router.push({ pathname: '/empty-deck', params: { scope: 'screenshots' } }) : router.push('/gallery?scope=screenshots')
           }>
-          <View style={s.miniGridRow}>
-            <View style={s.miniGridCell} />
-            <View style={s.miniGridCell} />
-            <View style={s.miniGridCell} />
-            <View style={s.miniGridCell} />
-          </View>
+          {screenshotThumbs.length > 0 ? (
+            <View style={s.miniGridRow}>
+              {screenshotThumbs.slice(0, 4).map((a, i) => (
+                <Image key={`${a.id}-${i}`} source={{ uri: a.uri }} style={s.miniGridCell} contentFit="cover" />
+              ))}
+            </View>
+          ) : (
+            <View style={s.miniGridRow}>
+              {[0, 1, 2, 3].map((n) => <View key={n} style={s.miniGridCell} />)}
+            </View>
+          )}
           <Text style={[type.body, { fontWeight: '600', color: colors.text }]}>screenshots</Text>
           <Text style={type.meta}>{stats.screenshots.count} · {formatBytes(stats.screenshots.bytes)}</Text>
         </Pressable>
@@ -196,18 +214,33 @@ const s = StyleSheet.create({
     gap: space.sm,
   },
   videoThumb: {
-    height: 27,
-    width: 36,
+    height: 58,
+    width: '100%',
     borderRadius: 8,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  videoThumbImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  videoThumbBadge: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    height: 16,
+    width: 16,
+    borderRadius: 999,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniGridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
+  miniGridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
   miniGridCell: {
-    height: 12,
-    width: 16,
-    borderRadius: 3,
+    height: 26,
+    width: '48%',
+    borderRadius: 6,
     backgroundColor: colors.cardAlt,
     borderWidth: 1,
     borderColor: colors.border,
